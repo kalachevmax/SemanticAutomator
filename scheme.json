@@ -1,0 +1,6 @@
+{
+  "name": "application",
+  "buildDir": "bin",
+  "srcDir": "lib",
+  "deps": []
+}
