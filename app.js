@@ -2,6 +2,7 @@
 
 var fs = require('fs');
 var path = require('path');
+var childProcess = require('child_process');
 
 
 /**
@@ -197,19 +198,19 @@ function makeCompilerArgs(files, complete, cancel) {
  */
 function invokeCompiler(args, complete, cancel) {
   console.log('invokeCompiler:', args);
-  var command = 'java -jar tools/compiler.jar';
-  complete('OK');
-}
 
+  function handleCompleted(err, stdout, stderr) {
+    console.log(stdout);
+    console.log(stderr);
 
-/**
- * @param {*} result
- * @param {!Function} complete
- * @param {!Function} cancel
- */
-function handleCompilerResult(result, complete, cancel) {
-  console.log('handleCompilerResult:', result);
-  complete();
+    if (err === null) {
+      complete();
+    } else {
+      cancel('exec command [' + command + '] error:' + err.toString());
+    }
+  }
+
+  childProcess.exec('java -jar tools/compiler.jar ' + args, handleCompleted);
 }
 
 
@@ -219,8 +220,7 @@ function handleCompilerResult(result, complete, cancel) {
 app.make = script([
   loadFilesList,
   makeCompilerArgs,
-  invokeCompiler,
-  handleCompilerResult
+  invokeCompiler
 ]);
 
 
