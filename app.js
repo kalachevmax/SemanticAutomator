@@ -36,6 +36,12 @@ app.SCHEME_FILE_NAME = 'scheme.json';
 
 
 /**
+ * @type {string}
+ */
+app.COMPILER_PATH = '/opt/closure-compiler.jar';
+
+
+/**
  * @type {app.Scheme}
  */
 app.__scheme = null;
@@ -219,7 +225,7 @@ function invokeCompiler(args, complete, cancel) {
     }
   }
 
-  childProcess.exec('java -jar tools/compiler.jar ' + args, handleCompleted);
+  childProcess.exec('java -jar ' + app.COMPILER_PATH + args, handleCompleted);
 }
 
 
