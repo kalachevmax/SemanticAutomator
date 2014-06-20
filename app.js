@@ -5,18 +5,113 @@ var fs = require('fs');
 
 
 /**
+ * @typedef {Object}
+ */
+app.Scheme;
+
+
+/**
+ * @typedef {function(*, !Function, !Function)}
+ */
+Action;
+
+
+/**
  * @type {string}
  */
 app.SCHEME_FILE_NAME = 'scheme.json';
 
 
 /**
- * @type {Object}
+ * @type {app.Scheme}
  */
 app.__scheme = null;
 
 
+function nop() {}
+
+
+/**
+ * @param {!Array.<Action>} actions
+ * @return {Action}
+ */
+function script(actions) {
+  return function(input, complete, cancel) {
+    var context = this;
+
+    function process(action, accumulator) {
+      action.call(context, accumulator, handleAction, cancel);
+    }
+
+    function handleAction(result) {
+      fold(result);
+    }
+
+    function fold(accumulator) {
+      if (actions.length > 0) {
+        process(actions.shift(), accumulator);
+      } else {
+        complete(accumulator);
+      }
+    }
+
+    fold(input);
+  }
+}
+
+
+/**
+ * @param {app.Scheme} scheme
+ * @param {!Function} complete
+ * @param {!Function} cancel
+ */
+function loadFilesList(scheme, complete, cancel) {
+
+}
+
+
+/**
+ * @param {!Array.<string>} files
+ * @param {!Function} complete
+ * @param {!Function} cancel
+ */
+function makeCompilerArgs(files, complete, cancel) {
+
+}
+
+
+/**
+ * @param {String} args
+ * @param {!Function} complete
+ * @param {!Function} cancel
+ */
+function invokeCompiler(args, complete, cancel) {
+
+}
+
+
+/**
+ * @param {*} result
+ * @param {!Function} complete
+ * @param {!Function} cancel
+ */
+function handleCompilerResult(result, complete, cancel) {
+
+}
+
+
+function showSuccessfullyResult() {
+  console.log('The application has been successfully built');
+}
+
+
 app.make = function() {
+  script([
+    loadFilesList,
+    makeCompilerArgs,
+    invokeCompiler,
+    handleCompilerResult
+  ])(app.__scheme, nop, console.log);
 };
 
 
