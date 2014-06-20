@@ -148,7 +148,20 @@ function loadFilesList(scheme, complete, cancel) {
  */
 function makeCompilerArgs(files, complete, cancel) {
   console.log('makeCompilerArgs:', files);
-  complete('""');
+
+  var args = '';
+
+  var i = 0,
+      l = files.length;
+
+  while (i < l) {
+    args += ' --js ' + files[i];
+    i += 1;
+  }
+
+  args += ' --js_output_file bin/index.js';
+
+  complete(args);
 }
 
 
@@ -159,6 +172,7 @@ function makeCompilerArgs(files, complete, cancel) {
  */
 function invokeCompiler(args, complete, cancel) {
   console.log('invokeCompiler:', args);
+  var command = 'java -jar tools/compiler.jar';
   complete('OK');
 }
 
