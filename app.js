@@ -211,7 +211,12 @@ function invokeCompiler(args, complete, cancel) {
   function handleCompleted(err, stdout, stderr) {
     console.log(stdout);
     console.log(stderr);
-    complete();
+
+    if (err === null) {
+      complete();
+    } else {
+      cancel();
+    }
   }
 
   childProcess.exec('java -jar tools/compiler.jar ' + args, handleCompleted);
@@ -226,27 +231,6 @@ app.make = script([
   makeCompilerArgs,
   invokeCompiler
 ]);
-
-
-/**
- * @type {app.Action}
- */
-app.check = function() {
-};
-
-
-/**
- * @type {app.Action}
- */
-app.compile = function() {
-};
-
-
-/**
- * @type {app.Action}
- */
-app.lint = function() {
-};
 
 
 /**
@@ -268,7 +252,7 @@ app.publish = function() {
  */
 function usage() {
   console.log('usage: app action');
-  console.log('action = make|update|publish|check|compile|lint');
+  console.log('action = make|update|publish');
 }
 
 
