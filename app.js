@@ -185,7 +185,16 @@ function makeCompilerArgs(files, complete, cancel) {
     i += 1;
   }
 
+  var options = scheme['compilerOptions'];
+
   args += ' --js_output_file ' + path.join(scheme['buildDir'], scheme['buildFileName']);
+  args += ' --compilation_level ' + (options['compilationLevel'] || 'WHITESPACE_ONLY');
+  args += ' --warning_level=' + (options['warningLevel'] || 'VERBOSE');
+  args += ' --language_in=' + (options['language'] || 'ECMASCRIPT5');
+
+  if (options['formatting'] !== '') {
+    args += ' --formatting=' + options['formatting'];
+  }
 
   complete(args);
 }
@@ -202,12 +211,7 @@ function invokeCompiler(args, complete, cancel) {
   function handleCompleted(err, stdout, stderr) {
     console.log(stdout);
     console.log(stderr);
-
-    if (err === null) {
-      complete();
-    } else {
-      cancel('exec command [' + command + '] error:' + err.toString());
-    }
+    complete();
   }
 
   childProcess.exec('java -jar tools/compiler.jar ' + args, handleCompleted);

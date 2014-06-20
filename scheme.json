@@ -1,7 +1,16 @@
 {
   "name": "application",
+
   "buildDir": "bin",
   "buildFileName": "index.js",
+
+  "compilerOptions": {
+    "compilationLevel": "ADVANCED_OPTIMIZATIONS",
+    "warningLevel": "VERBOSE",
+    "language": "ECMASCRIPT5",
+    "formatting": ""
+  },
+
   "srcDir": "lib",
   "deps": []
 }
