@@ -1,14 +1,31 @@
 
 
-var app = {};
 var fs = require('fs');
 var path = require('path');
+
+
+/**
+ * @namespace
+ */
+var app = {};
+
+
+/**
+ * @namespace
+ */
+app.actions = {};
 
 
 /**
  * @typedef {Object}
  */
 app.Scheme;
+
+
+/**
+ * @typedef {function(*, !Function, !Function)}
+ */
+app.Action;
 
 
 /**
@@ -23,12 +40,17 @@ app.SCHEME_FILE_NAME = 'scheme.json';
 app.__scheme = null;
 
 
-function nop() {}
+/**
+ * @enum {string}
+ */
+app.__MESSAGES = {
+  make: 'The application has been successfully built'
+};
 
 
 /**
- * @param {!Array.<!Function>} actions
- * @return {!Function}
+ * @param {!Array.<app.Action>} actions
+ * @return {app.Action}
  */
 function script(actions) {
   return function(input, complete, cancel) {
@@ -57,7 +79,7 @@ function script(actions) {
 
 /**
  * @param {!Array} list
- * @return {!Function}
+ * @return {app.Action}
  */
 function each(list) {
   return function(action, complete, cancel) {
@@ -184,52 +206,69 @@ function invokeCompiler(args, complete, cancel) {
  */
 function handleCompilerResult(result, complete, cancel) {
   console.log('handleCompilerResult:', result);
-  showSuccessfullyResult();
   complete();
 }
 
 
-function showSuccessfullyResult() {
-  console.log('The application has been successfully built');
-}
+/**
+ * @type {app.Action}
+ */
+app.make = script([
+  loadFilesList,
+  makeCompilerArgs,
+  invokeCompiler,
+  handleCompilerResult
+]);
 
 
-app.make = function() {
-  script([
-    loadFilesList,
-    makeCompilerArgs,
-    invokeCompiler,
-    handleCompilerResult
-  ])(app.__scheme, nop, console.log);
-};
-
-
-app.update = function() {
-};
-
-
-app.publish = function() {
-};
-
-
+/**
+ * @type {app.Action}
+ */
 app.check = function() {
 };
 
 
+/**
+ * @type {app.Action}
+ */
 app.compile = function() {
 };
 
 
+/**
+ * @type {app.Action}
+ */
 app.lint = function() {
 };
 
 
+/**
+ * @type {app.Action}
+ */
+app.update = function() {
+};
+
+
+/**
+ * @type {app.Action}
+ */
+app.publish = function() {
+};
+
+
+/**
+ *
+ */
 function usage() {
   console.log('usage: app action');
   console.log('action = make|update|publish|check|compile|lint');
 }
 
 
+/**
+ * @param {!Function} complete
+ * @param {!Function} cancel
+ */
 function loadScheme(complete, cancel) {
   fs.readFile(app.SCHEME_FILE_NAME, function(error, data) {
     if (error) {
@@ -247,19 +286,33 @@ function loadScheme(complete, cancel) {
 }
 
 
-function handleInput() {
-  if (process.argv.length > 2) {
-    if (typeof app[process.argv[2]] === 'function') {
-      app[process.argv[2]]();
-    } else {
-      usage();
-    }
-  } else {
-    app.make();
+/**
+ * @param {string} name
+ * @return {app.Action}
+ */
+function handleActionCompleted(name) {
+  return function() {
+    console.log(app.__MESSAGES[name]);
   }
 }
 
 
+/**
+ *
+ */
+function handleInput() {
+  if (process.argv.length === 2 || typeof app[process.argv[2]] === 'function') {
+    var name = process.argv[2] || 'make';
+    app[name](app.__scheme, handleActionCompleted(name), console.log);
+  } else {
+    usage();
+  }
+}
+
+
+/**
+ * @param {app.Scheme} scheme
+ */
 function handleSchemeLoaded(scheme) {
   app.__scheme = scheme;
   handleInput();
