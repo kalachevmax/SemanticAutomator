@@ -2,18 +2,13 @@
 
 var app = {};
 var fs = require('fs');
+var path = require('path');
 
 
 /**
  * @typedef {Object}
  */
 app.Scheme;
-
-
-/**
- * @typedef {function(*, !Function, !Function)}
- */
-Action;
 
 
 /**
@@ -32,8 +27,8 @@ function nop() {}
 
 
 /**
- * @param {!Array.<Action>} actions
- * @return {Action}
+ * @param {!Array.<!Function>} actions
+ * @return {!Function}
  */
 function script(actions) {
   return function(input, complete, cancel) {
@@ -61,12 +56,88 @@ function script(actions) {
 
 
 /**
+ * @param {!Array} list
+ * @return {!Function}
+ */
+function each(list) {
+  return function(action, complete, cancel) {
+    var context = this;
+
+    function process(item) {
+      action.call(context, item, handleAction, cancel);
+    }
+
+    function handleAction(result) {
+      fold(process);
+    }
+
+    function fold() {
+      if (list.length > 0) {
+        process(list.shift());
+      } else {
+        complete();
+      }
+    }
+
+    fold();
+  }
+}
+
+
+/**
  * @param {app.Scheme} scheme
  * @param {!Function} complete
  * @param {!Function} cancel
  */
 function loadFilesList(scheme, complete, cancel) {
+  console.log('loadFilesList:', scheme);
 
+  var fullPath = [];
+  var files = [];
+
+  function handleDirItem(item, complete, cancel) {
+    var fullItem = path.join(fullPath.join('/'), item);
+    fs.stat(fullItem, function(err, stats) {
+      if (err) {
+        cancel('Reading directory item [' + item + '] error:' + err.toString());
+      } else {
+        if (stats && stats.isDirectory()) {
+          fullPath.push(item);
+          readDir(item, complete, cancel);
+        } else {
+          files.push(fullItem);
+          complete();
+        }
+      }
+    });
+  }
+
+  function handleDirContent(items, complete, cancel) {
+    each(items)(handleDirItem, function() {
+      fullPath.pop();
+      complete();
+    }, cancel);
+  }
+
+  function readDir(dirPath, complete, cancel) {
+    fs.readdir(path.join(fullPath.join('/')), function(err, items) {
+      if (err) {
+        cancel('Reading directory [' +  dirPath + '] content error:' + err.toString());
+      } else {
+        handleDirContent(items, complete, cancel);
+      }
+    });
+  }
+
+  if (scheme === null) {
+    cancel('Scheme is not defined');
+  } else {
+    var libDir = scheme['srcDir'];
+    fullPath.push(libDir);
+    readDir(libDir, function() {
+      complete(files);
+    }, cancel);
+  }
 }
 
 
@@ -76,7 +147,8 @@ function loadFilesList(scheme, complete, cancel) {
  * @param {!Function} cancel
  */
 function makeCompilerArgs(files, complete, cancel) {
-
+  console.log('makeCompilerArgs:', files);
+  complete('""');
 }
 
 
@@ -86,7 +158,8 @@ function makeCompilerArgs(files, complete, cancel) {
  * @param {!Function} cancel
  */
 function invokeCompiler(args, complete, cancel) {
-
+  console.log('invokeCompiler:', args);
+  complete('OK');
 }
 
 
@@ -96,7 +169,9 @@ function invokeCompiler(args, complete, cancel) {
  * @param {!Function} cancel
  */
 function handleCompilerResult(result, complete, cancel) {
-
+  console.log('handleCompilerResult:', result);
+  showSuccessfullyResult();
+  complete();
 }
 
 
