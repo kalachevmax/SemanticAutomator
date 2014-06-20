@@ -1,6 +1,7 @@
 {
   "name": "application",
   "buildDir": "bin",
+  "buildFileName": "index.js",
   "srcDir": "lib",
   "deps": []
 }

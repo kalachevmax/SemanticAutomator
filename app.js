@@ -107,11 +107,13 @@ function each(list) {
 
 
 /**
- * @param {app.Scheme} scheme
+ * @this {app.Scheme}
+ * @param {*} _
  * @param {!Function} complete
  * @param {!Function} cancel
  */
-function loadFilesList(scheme, complete, cancel) {
+function loadFilesList(_, complete, cancel) {
+  var scheme = this;
   console.log('loadFilesList:', scheme);
 
   var fullPath = [];
@@ -170,6 +172,7 @@ function loadFilesList(scheme, complete, cancel) {
  */
 function makeCompilerArgs(files, complete, cancel) {
   console.log('makeCompilerArgs:', files);
+  var scheme = this;
 
   var args = '';
 
@@ -181,7 +184,7 @@ function makeCompilerArgs(files, complete, cancel) {
     i += 1;
   }
 
-  args += ' --js_output_file bin/index.js';
+  args += ' --js_output_file ' + path.join(scheme['buildDir'], scheme['buildFileName']);
 
   complete(args);
 }
@@ -303,7 +306,7 @@ function handleActionCompleted(name) {
 function handleInput() {
   if (process.argv.length === 2 || typeof app[process.argv[2]] === 'function') {
     var name = process.argv[2] || 'make';
-    app[name](app.__scheme, handleActionCompleted(name), console.log);
+    app[name].call(app.__scheme, null, handleActionCompleted(name), console.log);
   } else {
     usage();
   }
