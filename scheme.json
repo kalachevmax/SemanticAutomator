@@ -1,8 +1,9 @@
 {
-  "name": "AppMaintainerActions",
+  "name": "NodeAppDirector",
 
+  "srcDir": "lib",
   "buildDir": "./",
-  "buildFileName": "acts.js",
+  "buildFileName": "app.js",
 
   "compilerOptions": {
     "compilationLevel": "ADVANCED_OPTIMIZATIONS",
@@ -11,6 +12,5 @@
     "formatting": ""
   },
 
-  "srcDir": "lib",
-  "deps": []
+  "deps": {}
 }

@@ -3,9 +3,6 @@
 var fs = require('fs');
 var path = require('path');
 var childProcess = require('child_process');
-var acts = require('acts.js')
-var fm = {};
-
 
 /**
  * @namespace
@@ -16,7 +13,49 @@ var app = {};
 /**
  * @namespace
  */
-app.acts = {};
+var fm = {};
+
+
+/**
+ * @namespace
+ */
+var act = {};
+
+
+/**
+ * @namespace
+ */
+act.fs = {};
+
+
+/**
+ * @namespace
+ */
+act.gcc = {};
+
+
+/**
+ * @type {string}
+ */
+var SCHEME_FILE_NAME = 'scheme.json';
+
+
+/**
+ * @type {string}
+ */
+var DIRECTOR_NAME = 'NodeAppDirector';
+
+
+/**
+ * @type {string}
+ */
+var DIRECTOR_DIR = '/opt/' + DIRECTOR_NAME;
+
+
+/**
+ * @type {string}
+ */
+var COMPILER_PATH = '/opt/closure-compiler.jar';
 
 
 /**
@@ -32,29 +71,32 @@ app.Action;
 
 
 /**
- * @type {string}
- */
-app.SCHEME_FILE_NAME = 'scheme.json';
-
-
-/**
- * @type {string}
- */
-app.COMPILER_PATH = '/opt/closure-compiler.jar';
-
-
-/**
  * @type {app.Scheme}
  */
 app.__scheme = null;
 
 
 /**
- * @enum {string}
+ * @type {!Object.<string, app.Action>}
  */
-app.__MESSAGES = {
-  make: 'The application has been successfully built'
-};
+app.acts = {};
+
+
+/**
+ *
+ */
+function nop() {}
+
+
+/**
+ * @param {!Object} src
+ * @param {!Object} dst
+ */
+function copyObj(src, dst) {
+  for (var key in src) {
+    dst[key] = src;
+  }
+}
 
 
 /**
@@ -141,21 +183,111 @@ fm.if = function(action, trueBranch, opt_falseBranch) {
 
 
 /**
- * @param {!Array.<string>} files
- * @param {!Function} complete
- * @param {!Function} cancel
+ * @param {!Object=} opt_options
+ * @return {fm.Action}
  */
-function makeCompilerArgs(files, complete, cancel) {
-  console.log('makeCompilerArgs:', files);
+act.fs.readFile = function(opt_options) {
+  return function(filename, complete, cancel) {
+    fs.readFile(filename, opt_options, function(err, data) {
+      if (err === null) {
+        complete(data);
+      } else {
+        cancel('[act.fs.readFile]: ' + err.toString());
+      }
+    });
+  }
+};
+
+
+/**
+ * @param {string} itemPath
+ * @param {function(boolean)} complete
+ * @param {function(string, number=)} cancel
+ */
+act.fs.isDirectory = function(itemPath, complete, cancel) {
+  fs.stat(itemPath, function(err, stats) {
+    if (err) {
+      cancel('Error reading directory item:' + err.toString());
+    } else {
+      complete(stats && stats.isDirectory());
+    }
+  });
+};
+
+
+/**
+ * @param {string} dirPath
+ * @param {function(string)} complete
+ * @param {function(string, number=)} cancel
+ */
+act.fs.readDir = function(dirPath, complete, cancel) {
+  fs.readdir(dirPath, function(err, items) {
+    if (err) {
+      cancel('Error reading directory :' + err.toString());
+    } else {
+      complete(items);
+    }
+  });
+};
+
+
+/**
+ * @param {string} dirPath
+ * @param {function(!Array.<string>)} complete
+ * @param {function(string, number=)} cancel
+ */
+act.fs.readFilesTree = function(dirPath, complete, cancel) {
+  var fullPath = [];
+  var files = [];
+
+  function enterDir(dirPath, complete, cancel) {
+    fullPath.push(dirPath);
+    act.fs.readDir(dirPath, complete, cancel);
+  }
+
+  function leaveDir() {
+    fullPath.pop();
+  }
+
+  function addFile(file, complete, cacnel) {
+    files.push(fileName);
+    complete();
+  }
+
+  function handleDirItem(item, complete, cancel) {
+    var fullItemPath = path.join(fullPath.join('/'), item);
+
+    fm.script([
+      fm.if(act.fs.isDirectory, enterDir, addFile)
+    ])(fullItemPath, complete, cancel);
+  }
+
+  fm.script([
+    enterDir,
+    fm.each(handleDirItem),
+    leaveDir
+  ])(dirPath, function() {
+    complete(files);
+  }, cancel);
+};
+
+
+/**
+ * @param {!Array.<string>} fileNames
+ * @param {function(string)} complete
+ * @param {function(string, number=)} cancel
+ */
+act.gcc.makeArgs = function(fileNames, complete, cancel) {
+  console.log('act.gcc.makeArgs:', fileNames);
   var scheme = this;
 
   var args = '';
 
   var i = 0,
-      l = files.length;
+      l = fileNames.length;
 
   while (i < l) {
-    args += ' --js ' + files[i];
+    args += ' --js ' + fileNames[i];
     i += 1;
   }
 
@@ -171,16 +303,16 @@ function makeCompilerArgs(files, complete, cancel) {
   }
 
   complete(args);
-}
+};
 
 
 /**
- * @param {String} args
- * @param {!Function} complete
- * @param {!Function} cancel
+ * @param {string} args
+ * @param {function()} complete
+ * @param {function(string, number=)} cancel
  */
-function invokeCompiler(args, complete, cancel) {
-  console.log('invokeCompiler:', args);
+act.gcc.invoke = function(args, complete, cancel) {
+  console.log('act.gcc.invoke:', args);
 
   function handleCompleted(err, stdout, stderr) {
     console.log(stdout);
@@ -189,35 +321,11 @@ function invokeCompiler(args, complete, cancel) {
     if (err === null) {
       complete();
     } else {
-      cancel();
+      cancel('[act.gcc.invoke]: ' + err.toString());
     }
   }
 
-  childProcess.exec('java -jar ' + app.COMPILER_PATH + args, handleCompleted);
-}
-
-
-/**
- * @type {app.Action}
- */
-app.make = script([
-  loadFilesList,
-  makeCompilerArgs,
-  invokeCompiler
-]);
-
-
-/**
- * @type {app.Action}
- */
-app.update = function() {
-};
-
-
-/**
- * @type {app.Action}
- */
-app.publish = function() {
+  childProcess.exec('java -jar ' + COMPILER_PATH + args, handleCompleted);
 };
 
 
@@ -231,33 +339,12 @@ function usage() {
 
 
 /**
- * @param {!Function} complete
- * @param {!Function} cancel
- */
-function loadScheme(complete, cancel) {
-  fs.readFile(app.SCHEME_FILE_NAME, function(error, data) {
-    if (error) {
-      cancel('Scheme file reading error: ', error.toString());
-    }
-
-    try {
-      var scheme = JSON.parse(data);
-    } catch(error) {
-      cancel('Scheme file parsing error: ' + error.toString());
-    }
-
-    complete(scheme);
-  });
-}
-
-
-/**
  * @param {string} name
  * @return {app.Action}
  */
 function handleActionCompleted(name) {
   return function() {
-    console.log(app.__MESSAGES[name]);
+    console.log(act.MESSAGES[name]);
   }
 }
 
@@ -266,9 +353,10 @@ function handleActionCompleted(name) {
  *
  */
 function handleInput() {
-  if (process.argv.length === 2 || typeof app[process.argv[2]] === 'function') {
+  if (process.argv.length === 2 || typeof act[process.argv[2]] === 'function') {
     var name = process.argv[2] || 'make';
-    app[name].call(app.__scheme, null, handleActionCompleted(name), console.log);
+    act[name].call(app.__scheme, app.__scheme['srcDir'],
+        handleActionCompleted(name), console.log);
   } else {
     usage();
   }
@@ -276,12 +364,47 @@ function handleInput() {
 
 
 /**
- * @param {app.Scheme} scheme
+ * @param {string} filename
+ * @param {function()} complete
+ * @param {function(string, number=)} cancel
  */
-function handleSchemeLoaded(scheme) {
-  app.__scheme = scheme;
-  handleInput();
+function loadProjectScheme(filename, complete, cancel) {
+  act.fs.readFile({encoding: 'utf-8'})(filename, function(file) {
+    try {
+      app.__scheme = JSON.parse(file);
+      complete();
+    } catch(error) {
+      cancel('Scheme file parsing error: ' + error.toString());
+    }
+  }, cancel);
 }
 
 
-loadScheme(handleSchemeLoaded, console.log);
+/**
+ * @param {string} dir
+ * @returns {app.Action}
+ */
+function loadActs(dir) {
+  return function(_, complete, cancel) {
+    try {
+      var loadedActs = require(dir + '/acts.js');
+      copyObj(loadedActs, act);
+      complete();
+    } catch(error) {
+      cancel('[loadActs]: ' + error.toString());
+    }
+  }
+}
+
+
+/**
+ * @type {app.Action}
+ */
+var main = fm.script([
+  loadProjectScheme,
+  loadActs(DIRECTOR_DIR),
+  handleInput
+]);
+
+
+main(SCHEME_FILE_NAME, nop, console.log);
