@@ -237,10 +237,13 @@ act.fs.readDir = function(dirPath, complete, cancel) {
  * @param {function(string, number=)} cancel
  */
 act.fs.readFilesTree = function(dirPath, complete, cancel) {
+  console.log('act.fs.readFilesTree: ', dirPath);
+
   var fullPath = [];
   var files = [];
 
   function enterDir(dirPath, complete, cancel) {
+    console.
     fullPath.push(dirPath);
     act.fs.readDir(dirPath, complete, cancel);
   }
@@ -353,6 +356,7 @@ function handleActionCompleted(name) {
  *
  */
 function handleInput() {
+  console.log('handleInput: ', process.argv);
   if (process.argv.length === 2 || typeof act[process.argv[2]] === 'function') {
     var name = process.argv[2] || 'make';
     act[name].call(app.__scheme, app.__scheme['srcDir'],
@@ -369,6 +373,7 @@ function handleInput() {
  * @param {function(string, number=)} cancel
  */
 function loadProjectScheme(filename, complete, cancel) {
+  console.log('loadProjectScheme:', filename);
   act.fs.readFile({encoding: 'utf-8'})(filename, function(file) {
     try {
       app.__scheme = JSON.parse(file);
@@ -397,12 +402,33 @@ function loadActs(dir) {
 }
 
 
+act.MESSAGES = {
+  make: 'The application has been successfully built'
+};
+
+
+act.make = fm.script([
+  act.fs.readFilesTree,
+  act.gcc.makeArgs,
+  act.gcc.invoke
+]);
+
+
+act.update = fm.script([
+]);
+
+
+act.publish = fm.script([
+
+]);
+
+
+
 /**
  * @type {app.Action}
  */
 var main = fm.script([
   loadProjectScheme,
-  loadActs(DIRECTOR_DIR),
   handleInput
 ]);
 
