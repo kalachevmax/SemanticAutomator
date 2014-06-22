@@ -3,6 +3,8 @@
 var fs = require('fs');
 var path = require('path');
 var childProcess = require('child_process');
+var acts = require('acts.js')
+var fm = {};
 
 
 /**
@@ -14,7 +16,7 @@ var app = {};
 /**
  * @namespace
  */
-app.actions = {};
+app.acts = {};
 
 
 /**
@@ -59,7 +61,7 @@ app.__MESSAGES = {
  * @param {!Array.<app.Action>} actions
  * @return {app.Action}
  */
-function script(actions) {
+fm.script = function(actions) {
   return function(input, complete, cancel) {
     var context = this;
 
@@ -81,15 +83,15 @@ function script(actions) {
 
     fold(input);
   }
-}
+};
 
 
 /**
- * @param {!Array} list
+ * @param {app.Action} action
  * @return {app.Action}
  */
-function each(list) {
-  return function(action, complete, cancel) {
+fm.each = function(action) {
+  return function(list, complete, cancel) {
     var context = this;
 
     function process(item) {
@@ -97,7 +99,7 @@ function each(list) {
     }
 
     function handleAction(result) {
-      fold(process);
+      fold();
     }
 
     function fold() {
@@ -110,66 +112,32 @@ function each(list) {
 
     fold();
   }
-}
+};
 
 
 /**
- * @this {app.Scheme}
- * @param {*} _
- * @param {!Function} complete
- * @param {!Function} cancel
+ * @param {app.Action} action
+ * @param {app.Action} trueBranch
+ * @param {app.Action=} opt_falseBranch
+ * @return {app.Action}
  */
-function loadFilesList(_, complete, cancel) {
-  var scheme = this;
-  console.log('loadFilesList:', scheme);
+fm.if = function(action, trueBranch, opt_falseBranch) {
+  return function(atom, complete, cancel) {
+    var context = this;
 
-  var fullPath = [];
-  var files = [];
-
-  function handleDirItem(item, complete, cancel) {
-    var fullItem = path.join(fullPath.join('/'), item);
-    fs.stat(fullItem, function(err, stats) {
-      if (err) {
-        cancel('Reading directory item [' + item + '] error:' + err.toString());
+    action(atom, function(result) {
+      if (result) {
+        trueBranch.call(context, atom, complete, cancel);
       } else {
-        if (stats && stats.isDirectory()) {
-          fullPath.push(item);
-          readDir(item, complete, cancel);
+        if (typeof opt_falseBranch === 'function') {
+          opt_falseBranch.call(context, atom, complete, cancel);
         } else {
-          files.push(fullItem);
-          complete();
+          complete(atom);
         }
       }
-    });
-  }
-
-  function handleDirContent(items, complete, cancel) {
-    each(items)(handleDirItem, function() {
-      fullPath.pop();
-      complete();
     }, cancel);
   }
-
-  function readDir(dirPath, complete, cancel) {
-    fs.readdir(path.join(fullPath.join('/')), function(err, items) {
-      if (err) {
-        cancel('Reading directory [' +  dirPath + '] content error:' + err.toString());
-      } else {
-        handleDirContent(items, complete, cancel);
-      }
-    });
-  }
-
-  if (scheme === null) {
-    cancel('Scheme is not defined');
-  } else {
-    var libDir = scheme['srcDir'];
-    fullPath.push(libDir);
-    readDir(libDir, function() {
-      complete(files);
-    }, cancel);
-  }
-}
+};
 
 
 /**

@@ -1,8 +1,8 @@
 {
-  "name": "application",
+  "name": "AppMaintainerActions",
 
-  "buildDir": "bin",
-  "buildFileName": "index.js",
+  "buildDir": "./",
+  "buildFileName": "acts.js",
 
   "compilerOptions": {
     "compilationLevel": "ADVANCED_OPTIMIZATIONS",
