@@ -237,38 +237,48 @@ act.fs.readDir = function(dirPath, complete, cancel) {
  * @param {function(string, number=)} cancel
  */
 act.fs.readFilesTree = function(dirPath, complete, cancel) {
-  console.log('act.fs.readFilesTree: ', dirPath);
-
   var fullPath = [];
   var files = [];
 
-  function enterDir(dirPath, complete, cancel) {
-    console.
-    fullPath.push(dirPath);
-    act.fs.readDir(dirPath, complete, cancel);
+  function enterDir(dirPath) {
+    return function (fullDirPath, complete, cancel) {
+      fullPath.push(dirPath);
+      complete(fullDirPath);
+    }
   }
 
-  function leaveDir() {
+  function leaveDir(_, complete, cancel) {
     fullPath.pop();
-  }
-
-  function addFile(file, complete, cacnel) {
-    files.push(fileName);
     complete();
   }
 
-  function handleDirItem(item, complete, cancel) {
+  function addFile(file, complete, cancel) {
+    files.push(file);
+    complete();
+  }
+
+  function processDir(dirPath, complete, cancel) {
+    fm.script([
+      act.fs.readDir,
+      fm.each(processItem),
+      leaveDir
+    ])(dirPath, complete, cancel);
+  }
+
+  function processItem(item, complete, cancel) {
     var fullItemPath = path.join(fullPath.join('/'), item);
 
     fm.script([
-      fm.if(act.fs.isDirectory, enterDir, addFile)
+      fm.if(act.fs.isDirectory, fm.script([
+        enterDir(item),
+        processDir
+      ]), addFile)
     ])(fullItemPath, complete, cancel);
   }
 
   fm.script([
-    enterDir,
-    fm.each(handleDirItem),
-    leaveDir
+    enterDir(dirPath),
+    processDir
   ])(dirPath, function() {
     complete(files);
   }, cancel);
