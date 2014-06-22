@@ -200,122 +200,50 @@ act.fs.readFile = function(opt_options) {
 
 
 /**
- * @param {string} itemPath
- * @param {function(boolean)} complete
- * @param {function(string, number=)} cancel
- */
-act.fs.isDirectory = function(itemPath, complete, cancel) {
-  fs.stat(itemPath, function(err, stats) {
-    if (err) {
-      cancel('Error reading directory item:' + err.toString());
-    } else {
-      complete(stats && stats.isDirectory());
-    }
-  });
-};
-
-
-/**
- * @param {string} dirPath
+ * @this {app.Scheme}
+ * @param {*} _
  * @param {function(string)} complete
  * @param {function(string, number=)} cancel
  */
-act.fs.readDir = function(dirPath, complete, cancel) {
-  fs.readdir(dirPath, function(err, items) {
-    if (err) {
-      cancel('Error reading directory :' + err.toString());
-    } else {
-      complete(items);
-    }
-  });
-};
-
-
-/**
- * @param {string} dirPath
- * @param {function(!Array.<string>)} complete
- * @param {function(string, number=)} cancel
- */
-act.fs.readFilesTree = function(dirPath, complete, cancel) {
-  var fullPath = [];
-  var files = [];
-
-  function enterDir(dirPath) {
-    return function (fullDirPath, complete, cancel) {
-      fullPath.push(dirPath);
-      complete(fullDirPath);
-    }
-  }
-
-  function leaveDir(_, complete, cancel) {
-    fullPath.pop();
-    complete();
-  }
-
-  function addFile(file, complete, cancel) {
-    files.push(file);
-    complete();
-  }
-
-  function processDir(dirPath, complete, cancel) {
-    fm.script([
-      act.fs.readDir,
-      fm.each(processItem),
-      leaveDir
-    ])(dirPath, complete, cancel);
-  }
-
-  function processItem(item, complete, cancel) {
-    var fullItemPath = path.join(fullPath.join('/'), item);
-
-    fm.script([
-      fm.if(act.fs.isDirectory, fm.script([
-        enterDir(item),
-        processDir
-      ]), addFile)
-    ])(fullItemPath, complete, cancel);
-  }
-
-  fm.script([
-    enterDir(dirPath),
-    processDir
-  ])(dirPath, function() {
-    complete(files);
-  }, cancel);
-};
-
-
-/**
- * @param {!Array.<string>} fileNames
- * @param {function(string)} complete
- * @param {function(string, number=)} cancel
- */
-act.gcc.makeArgs = function(fileNames, complete, cancel) {
-  console.log('act.gcc.makeArgs:', fileNames);
+act.gcc.makeArgs = function(_, complete, cancel) {
   var scheme = this;
+  var srcDir = scheme['srcDir'];
+  var rootNamespace = scheme['rootNamespace'];
+  var filenames = scheme['src'];
 
-  var args = '';
+  console.log('act.gcc.makeArgs:', filenames);
 
-  var i = 0,
-      l = fileNames.length;
+  if (typeof srcDir === 'string' &&
+      typeof rootNamespace === 'string' &&
+      filenames instanceof Array) {
 
-  while (i < l) {
-    args += ' --js ' + fileNames[i];
-    i += 1;
+    var args = '';
+
+    var i = 0,
+        l = filenames.length;
+
+    while (i < l) {
+      args += ' --js ' + path.join(srcDir, rootNamespace, filenames[i]);
+      i += 1;
+    }
+
+    var options = scheme['compilerOptions'];
+
+    args += ' --js_output_file ' + path.join(scheme['buildDir'], scheme['buildFileName']);
+    args += ' --compilation_level ' + (options['compilationLevel'] || 'WHITESPACE_ONLY');
+    args += ' --warning_level=' + (options['warningLevel'] || 'VERBOSE');
+    args += ' --language_in=' + (options['language'] || 'ECMASCRIPT5');
+
+    if (options['formatting'] !== '') {
+      args += ' --formatting=' + options['formatting'];
+    }
+
+    complete(args);
+
+
+  } else {
+    cancel('[scheme]: missing one of (srcDir, rootNamespace, src)');
   }
-
-  var options = scheme['compilerOptions'];
-
-  args += ' --js_output_file ' + path.join(scheme['buildDir'], scheme['buildFileName']);
-  args += ' --compilation_level ' + (options['compilationLevel'] || 'WHITESPACE_ONLY');
-  args += ' --warning_level=' + (options['warningLevel'] || 'VERBOSE');
-  args += ' --language_in=' + (options['language'] || 'ECMASCRIPT5');
-
-  if (options['formatting'] !== '') {
-    args += ' --formatting=' + options['formatting'];
-  }
-
-  complete(args);
 };
 
 
@@ -395,30 +323,12 @@ function loadProjectScheme(filename, complete, cancel) {
 }
 
 
-/**
- * @param {string} dir
- * @returns {app.Action}
- */
-function loadActs(dir) {
-  return function(_, complete, cancel) {
-    try {
-      var loadedActs = require(dir + '/acts.js');
-      copyObj(loadedActs, act);
-      complete();
-    } catch(error) {
-      cancel('[loadActs]: ' + error.toString());
-    }
-  }
-}
-
-
 act.MESSAGES = {
   make: 'The application has been successfully built'
 };
 
 
 act.make = fm.script([
-  act.fs.readFilesTree,
   act.gcc.makeArgs,
   act.gcc.invoke
 ]);
