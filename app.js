@@ -55,6 +55,12 @@ var DIRECTOR_DIR = '/opt/' + DIRECTOR_NAME;
 /**
  * @type {string}
  */
+var NODE_EXTERNS_DIR = DIRECTOR_DIR + '/externs';
+
+
+/**
+ * @type {string}
+ */
 var COMPILER_PATH = '/opt/closure-compiler.jar';
 
 
@@ -140,7 +146,7 @@ fm.each = function(action) {
       action.call(context, item, handleAction, cancel);
     }
 
-    function handleAction(result) {
+    function handleAction() {
       fold();
     }
 
@@ -200,24 +206,107 @@ act.fs.readFile = function(opt_options) {
 
 
 /**
- * @this {app.Scheme}
- * @param {*} _
+ * @param {string} itemPath
+ * @param {function(boolean)} complete
+ * @param {function(string, number=)} cancel
+ */
+act.fs.isDirectory = function(itemPath, complete, cancel) {
+  fs.stat(itemPath, function(err, stats) {
+    if (err) {
+      cancel('Error reading directory item:' + err.toString());
+    } else {
+      complete(stats && stats.isDirectory());
+    }
+  });
+};
+
+
+/**
+ * @param {string} dirPath
  * @param {function(string)} complete
  * @param {function(string, number=)} cancel
  */
-act.gcc.makeArgs = function(_, complete, cancel) {
-  var scheme = this;
-  var srcDir = scheme['srcDir'];
-  var rootNamespace = scheme['rootNamespace'];
-  var filenames = scheme['src'];
+act.fs.readDir = function(dirPath, complete, cancel) {
+  fs.readdir(dirPath, function(err, items) {
+    if (err) {
+      cancel('Error reading directory :' + err.toString());
+    } else {
+      complete(items);
+    }
+  });
+};
 
-  console.log('act.gcc.makeArgs:', filenames);
+
+/**
+ * @param {string} dirPath
+ * @param {function(!Array.<string>)} complete
+ * @param {function(string, number=)} cancel
+ */
+act.fs.readFilesTree = function(dirPath, complete, cancel) {
+  var fullPath = [];
+  var files = [];
+
+  function enterDir(dirPath) {
+    return function (fullDirPath, complete, cancel) {
+      fullPath.push(dirPath);
+      complete(fullDirPath);
+    }
+  }
+
+  function leaveDir(_, complete, cancel) {
+    fullPath.pop();
+    complete();
+  }
+
+  function addFile(file, complete, cancel) {
+    files.push(file);
+    complete();
+  }
+
+  function processDir(dirPath, complete, cancel) {
+    fm.script([
+      act.fs.readDir,
+      fm.each(processItem),
+      leaveDir
+    ])(dirPath, complete, cancel);
+  }
+
+  function processItem(item, complete, cancel) {
+    var fullItemPath = path.join(fullPath.join('/'), item);
+
+    fm.script([
+      fm.if(act.fs.isDirectory, fm.script([
+        enterDir(item),
+        processDir
+      ]), addFile)
+    ])(fullItemPath, complete, cancel);
+  }
+
+  fm.script([
+    enterDir(dirPath),
+    processDir
+  ])(dirPath, function() {
+    complete(files);
+  }, cancel);
+};
+
+
+/**
+ * @this {app.Scheme}
+ * @param {string} args
+ * @param {function(string)} complete
+ * @param {function(string, number=)} cancel
+ */
+act.gcc.makeSrcArgs = function(args, complete, cancel) {
+  var srcDir = this['srcDir'];
+  var rootNamespace = this['rootNamespace'];
+  var filenames = this['src'];
+
+  console.log('act.gcc.makeSrcArgs:', filenames);
 
   if (typeof srcDir === 'string' &&
       typeof rootNamespace === 'string' &&
       filenames instanceof Array) {
-
-    var args = '';
 
     var i = 0,
         l = filenames.length;
@@ -227,23 +316,74 @@ act.gcc.makeArgs = function(_, complete, cancel) {
       i += 1;
     }
 
-    var options = scheme['compilerOptions'];
+    complete(args);
+  } else {
+    cancel('[scheme]: missing one of ("srcDir", "rootNamespace", "src")');
+  }
+};
 
-    args += ' --js_output_file ' + path.join(scheme['buildDir'], scheme['buildFileName']);
-    args += ' --compilation_level ' + (options['compilationLevel'] || 'WHITESPACE_ONLY');
-    args += ' --warning_level=' + (options['warningLevel'] || 'VERBOSE');
-    args += ' --language_in=' + (options['language'] || 'ECMASCRIPT5');
 
-    if (options['formatting'] !== '') {
-      args += ' --formatting=' + options['formatting'];
+/**
+ * @param {string} externsDir
+ * @return {app.Action}
+ */
+act.gcc.makeExternsArgs = function(externsDir) {
+  return function(args, complete, cancel) {
+    if (externsDir !== '') {
+      act.fs.readFilesTree(externsDir, handleReaded, cancel);
+    } else {
+      cancel('[scheme]: missing "externs"');
     }
 
-    complete(args);
+    function handleReaded(filenames) {
+      var i = 0,
+          l = filenames.length;
 
+      while (i < l) {
+        args += ' --externs ' + filenames[i];
+        i += 1;
+      }
 
-  } else {
-    cancel('[scheme]: missing one of (srcDir, rootNamespace, src)');
+      complete(args)
+    }
   }
+};
+
+
+/**
+ * @this {app.Scheme}
+ * @param {string} args
+ * @param {function(string)} complete
+ * @param {function(string, number=)} cancel
+ */
+act.gcc.makeOptionsArgs = function(args, complete, cancel) {
+  var options = this['compilerOptions'];
+
+  args += ' --js_output_file ' + path.join(this['buildDir'], this['buildFileName']);
+  args += ' --compilation_level ' + (options['compilationLevel'] || 'WHITESPACE_ONLY');
+  args += ' --warning_level=' + (options['warningLevel'] || 'VERBOSE');
+  args += ' --language_in=' + (options['language'] || 'ECMASCRIPT5');
+
+  if (options['formatting'] !== '') {
+    args += ' --formatting=' + options['formatting'];
+  }
+
+  complete(args);
+};
+
+
+/**
+ * @param {app.Scheme} scheme
+ * @param {function(string)} complete
+ * @param {function(string, number=)} cancel
+ */
+act.gcc.makeArgs = function(scheme, complete, cancel) {
+  fm.script([
+    act.gcc.makeSrcArgs,
+    act.gcc.makeExternsArgs(NODE_EXTERNS_DIR),
+    act.gcc.makeExternsArgs(scheme['externs'] || ''),
+    act.gcc.makeOptionsArgs
+  ]).call(this, '', complete, cancel);
 };
 
 
@@ -297,7 +437,7 @@ function handleInput() {
   console.log('handleInput: ', process.argv);
   if (process.argv.length === 2 || typeof act[process.argv[2]] === 'function') {
     var name = process.argv[2] || 'make';
-    act[name].call(app.__scheme, app.__scheme['srcDir'],
+    act[name].call(app.__scheme, app.__scheme,
         handleActionCompleted(name), console.log);
   } else {
     usage();
