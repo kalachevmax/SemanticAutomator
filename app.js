@@ -83,6 +83,12 @@ app.Action;
 
 
 /**
+ * @typedef {!Object}
+ */
+app.Module;
+
+
+/**
  * @type {app.Scheme}
  */
 app.__scheme = null;
@@ -107,6 +113,7 @@ function nop() {}
 fm.script = function(actions) {
   return function(input, complete, cancel) {
     var context = this;
+    var localActions = actions.slice(0);
 
     function process(action, accumulator) {
       action.call(context, accumulator, handleAction, cancel);
@@ -117,8 +124,8 @@ fm.script = function(actions) {
     }
 
     function fold(accumulator) {
-      if (actions.length > 0) {
-        process(actions.shift(), accumulator);
+      if (localActions.length > 0) {
+        process(localActions.shift(), accumulator);
       } else {
         complete(accumulator);
       }
@@ -138,11 +145,7 @@ fm.each = function(action) {
     var context = this;
 
     function process(item) {
-      action.call(context, item, handleAction, cancel);
-    }
-
-    function handleAction() {
-      fold();
+      action.call(context, item, fold, cancel);
     }
 
     function fold() {
@@ -287,33 +290,38 @@ act.fs.readFilesTree = function(dirPath, complete, cancel) {
 
 
 /**
- * @this {app.Scheme}
- * @param {string} args
- * @param {function(string)} complete
- * @param {function(string, number=)} cancel
+ * @param {app.Module} module
+ * @return {app.Action}
  */
-act.gcc.makeSrcArgs = function(args, complete, cancel) {
-  var srcDir = this['srcDir'];
-  var rootNamespace = this['rootNamespace'];
-  var filenames = this['src'];
+act.gcc.makeSrcArgs = function(module) {
+  /**
+   * @this {app.Scheme}
+   * @param {string} args
+   * @param {function(string)} complete
+   * @param {function(string, number=)} cancel
+   */
+  return function (args, complete, cancel) {
+    var scheme = this;
+    var srcDir = scheme['srcDir'];
+    var rootNamespace = scheme['rootNamespace'];
+    var filenames = module['src'];
 
-  console.log('act.gcc.makeSrcArgs:', filenames);
+    if (typeof srcDir === 'string' &&
+        typeof rootNamespace === 'string' &&
+        filenames instanceof Array) {
 
-  if (typeof srcDir === 'string' &&
-      typeof rootNamespace === 'string' &&
-      filenames instanceof Array) {
+      var i = 0,
+          l = filenames.length;
 
-    var i = 0,
-        l = filenames.length;
+      while (i < l) {
+        args += ' --js ' + path.join(srcDir, rootNamespace, filenames[i]);
+        i += 1;
+      }
 
-    while (i < l) {
-      args += ' --js ' + path.join(srcDir, rootNamespace, filenames[i]);
-      i += 1;
+      complete(args);
+    } else {
+      cancel('[act.gcc.makeSrcArgs] missing section: srcDir|rootNamespace|module.src');
     }
-
-    complete(args);
-  } else {
-    cancel('[scheme]: missing one of ("srcDir", "rootNamespace", "src")');
   }
 };
 
@@ -323,11 +331,16 @@ act.gcc.makeSrcArgs = function(args, complete, cancel) {
  * @return {app.Action}
  */
 act.gcc.makeExternsArgs = function(externsDir) {
+  /**
+   * @param {string} args
+   * @param {function(string)} complete
+   * @param {function(string, number=)} cancel
+   */
   return function(args, complete, cancel) {
     if (externsDir !== '') {
       act.fs.readFilesTree(externsDir, handleReaded, cancel);
     } else {
-      cancel('[scheme]: missing "externs"');
+      cancel('[act.gcc.makeExternsArgs] missing externs section');
     }
 
     function handleReaded(filenames) {
@@ -346,38 +359,46 @@ act.gcc.makeExternsArgs = function(externsDir) {
 
 
 /**
- * @this {app.Scheme}
- * @param {string} args
- * @param {function(string)} complete
- * @param {function(string, number=)} cancel
+ * @param {app.Module} module
+ * @return {app.Action}
  */
-act.gcc.makeOptionsArgs = function(args, complete, cancel) {
-  var options = this['compilerOptions'];
+act.gcc.makeOptionsArgs = function(module) {
+  /**
+   * @this {app.Scheme}
+   * @param {string} args
+   * @param {function(string)} complete
+   * @param {function(string, number=)} cancel
+   */
+  return function(args, complete, cancel) {
+    var scheme = this;
+    var options = scheme['compilerOptions'];
 
-  args += ' --js_output_file ' + path.join(this['buildDir'], this['buildFileName']);
-  args += ' --compilation_level ' + (options['compilationLevel'] || 'WHITESPACE_ONLY');
-  args += ' --warning_level=' + (options['warningLevel'] || 'VERBOSE');
-  args += ' --language_in=' + (options['language'] || 'ECMASCRIPT5');
+    args += ' --js_output_file ' + path.join(scheme['buildDir'], module['name']) + '.js';
+    args += ' --compilation_level ' + (options['compilationLevel'] || 'WHITESPACE_ONLY');
+    args += ' --warning_level=' + (options['warningLevel'] || 'VERBOSE');
+    args += ' --language_in=' + (options['language'] || 'ECMASCRIPT5');
 
-  if (options['formatting'] !== '') {
-    args += ' --formatting=' + options['formatting'];
+    if (options['formatting'] !== '') {
+      args += ' --formatting=' + options['formatting'];
+    }
+
+    complete(args);
   }
-
-  complete(args);
 };
 
 
 /**
- * @param {app.Scheme} scheme
+ * @this {app.Scheme}
+ * @param {app.Module} module
  * @param {function(string)} complete
  * @param {function(string, number=)} cancel
  */
-act.gcc.makeArgs = function(scheme, complete, cancel) {
+act.gcc.makeArgs = function(module, complete, cancel) {
   fm.script([
-    act.gcc.makeSrcArgs,
+    act.gcc.makeSrcArgs(module),
     act.gcc.makeExternsArgs(NODE_EXTERNS_DIR),
-    act.gcc.makeExternsArgs(scheme['externs'] || ''),
-    act.gcc.makeOptionsArgs
+    act.gcc.makeExternsArgs(this['externs'] || ''),
+    act.gcc.makeOptionsArgs(module)
   ]).call(this, '', complete, cancel);
 };
 
@@ -407,7 +428,7 @@ act.gcc.invoke = function(args, complete, cancel) {
 
 /**
  * @param {app.Scheme} scheme
- * @param {function(!Array.<!Object>)} complete
+ * @param {function(!Array.<app.Module>)} complete
  * @param {function(string, number=)} cancel
  */
 act.scheme.getModules = function(scheme, complete, cancel) {
@@ -478,7 +499,8 @@ act.MESSAGES = {
 
 
 act.make = fm.script([
-  act.scheme.getModules(),
+  act.scheme.getModules,
+
   fm.each(fm.script([
     act.gcc.makeArgs,
     act.gcc.invoke

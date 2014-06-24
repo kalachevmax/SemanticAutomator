@@ -1,4 +1,4 @@
-
+#!/bin/sh
 
 sudo mkdir -p /opt/NodeAppDirector
 
