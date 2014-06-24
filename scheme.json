@@ -1,9 +1,7 @@
 {
   "name": "NodeAppDirector",
 
-  "srcDir": "lib",
   "buildDir": "./",
-  "buildFileName": "app.js",
 
   "compilerOptions": {
     "compilationLevel": "ADVANCED_OPTIMIZATIONS",
@@ -12,5 +10,28 @@
     "formatting": ""
   },
 
-  "deps": {}
+  "srcDir": "lib",
+  "rootNamespace": "app",
+
+  "modules": [{
+    "name": "app1",
+    "src": [
+      "app1.js"
+    ]
+  }, {
+    "name": "app2",
+    "src": [
+      "app2.js"
+    ]
+  }],
+
+  "externs": "externs",
+
+  "deps": [{
+    "justFM": {
+      "repo": "https://github.com/kalachevmax/justFM",
+      "type": "git",
+      "version": "*"
+    }
+  }]
 }

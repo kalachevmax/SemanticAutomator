@@ -35,6 +35,12 @@ act.gcc = {};
 
 
 /**
+ * @namespace
+ */
+act.scheme = {};
+
+
+/**
  * @type {string}
  */
 var SCHEME_FILE_NAME = 'scheme.json';
@@ -92,17 +98,6 @@ app.acts = {};
  *
  */
 function nop() {}
-
-
-/**
- * @param {!Object} src
- * @param {!Object} dst
- */
-function copyObj(src, dst) {
-  for (var key in src) {
-    dst[key] = src;
-  }
-}
 
 
 /**
@@ -411,6 +406,20 @@ act.gcc.invoke = function(args, complete, cancel) {
 
 
 /**
+ * @param {app.Scheme} scheme
+ * @param {function(!Array.<!Object>)} complete
+ * @param {function(string, number=)} cancel
+ */
+act.scheme.getModules = function(scheme, complete, cancel) {
+  if (scheme['modules'] instanceof Array) {
+    complete(scheme['modules']);
+  } else {
+    cancel('[act.scheme.getModules] missing modules section');
+  }
+};
+
+
+/**
  *
  */
 function usage() {
@@ -469,8 +478,11 @@ act.MESSAGES = {
 
 
 act.make = fm.script([
-  act.gcc.makeArgs,
-  act.gcc.invoke
+  act.scheme.getModules(),
+  fm.each(fm.script([
+    act.gcc.makeArgs,
+    act.gcc.invoke
+  ]))
 ]);
 
 
