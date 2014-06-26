@@ -119,6 +119,20 @@ function nop() {}
 
 
 /**
+ * @param {!Object} base
+ * @param {!Object} obj
+ * @return {!Object}
+ */
+function extend(base, obj) {
+  for (var key in obj) {
+    base[key] = obj[key];
+  }
+
+  return base;
+}
+
+
+/**
  * @param {!Array.<app.Action>} actions
  * @return {app.Action}
  */
@@ -450,6 +464,35 @@ act.scheme.getModules = function(scheme, complete, cancel) {
 
 
 /**
+ * @param {!Object.<string, !Object>} obj
+ * @return {!Array.<!Object>}
+ */
+act.scheme.__transformToArray = function(obj) {
+  var result = [];
+
+  for (var name in obj) {
+    result.push(extend({ name: name}, obj[name]));
+  }
+
+  return result;
+};
+
+
+/**
+ * @param {app.Scheme} scheme
+ * @param {function(!Array.<!Object>)} complete
+ * @param {function(string, number=)} cancel
+ */
+act.scheme.getDeps = function(scheme, complete, cancel) {
+  if (scheme['deps'] instanceof Object) {
+    complete(act.scheme.__transformToArray(scheme['deps']));
+  } else {
+    cancel('[act.scheme.getDeps] missing deps section');
+  }
+};
+
+
+/**
  *
  */
 function usage() {
@@ -518,6 +561,8 @@ act.make = fm.script([
 
 
 act.update = fm.script([
+  act.scheme.getDeps,
+  fm.each(act.git.clone)
 ]);
 
 
