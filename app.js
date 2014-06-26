@@ -19,6 +19,12 @@ var fm = {};
 /**
  * @namespace
  */
+var dm = {};
+
+
+/**
+ * @namespace
+ */
 var act = {};
 
 
@@ -115,7 +121,13 @@ app.Scheme;
 /**
  * @typedef {function(*, !Function, !Function)}
  */
-app.Action;
+fm.Action;
+
+
+/**
+ * @typedef {*}
+ */
+fm.Input;
 
 
 /**
@@ -131,7 +143,7 @@ app.__scheme = null;
 
 
 /**
- * @type {!Object.<string, app.Action>}
+ * @type {!Object.<string, fm.Action>}
  */
 app.acts = {};
 
@@ -157,8 +169,53 @@ function extend(base, obj) {
 
 
 /**
- * @param {!Array.<app.Action>} actions
- * @return {app.Action}
+ * @type {!Object.<string, fm.Input>}
+ */
+dm.__db = {};
+
+
+/**
+ * @param {string} key
+ * @return {fm.Action}
+ */
+dm.get = function(key) {
+  /**
+   * @param {fm.Input} _
+   * @param {function(fm.Input)} complete
+   * @param {function(string, number=)} cancel
+   */
+  return function (_, complete, cancel) {
+    if (typeof dm.__db[key] !== 'undefined') {
+      complete(dm.__db[key]);
+    } else {
+      cancel('[dm.get] key ' + key + 'does not exists on storage');
+    }
+  };
+};
+
+
+/**
+ * @param {string} key
+ * @param {fm.Action} action
+ * @return {fm.Action}
+ */
+dm.set = function(key, action) {
+  /**
+   * @param {fm.Input} input
+   * @param {function(fm.Input)} complete
+   * @param {function(string, number=)} cancel
+   */
+  return function(input, complete, cancel) {
+    action(input, function(data) {
+      dm.__db[key] = data;
+    }, cancel);
+  }
+};
+
+
+/**
+ * @param {!Array.<fm.Action>} actions
+ * @return {fm.Action}
  */
 fm.script = function(actions) {
   return function(input, complete, cancel) {
@@ -187,8 +244,8 @@ fm.script = function(actions) {
 
 
 /**
- * @param {app.Action} action
- * @return {app.Action}
+ * @param {fm.Action} action
+ * @return {fm.Action}
  */
 fm.each = function(action) {
   return function(list, complete, cancel) {
@@ -212,10 +269,10 @@ fm.each = function(action) {
 
 
 /**
- * @param {app.Action} action
- * @param {app.Action} trueBranch
- * @param {app.Action=} opt_falseBranch
- * @return {app.Action}
+ * @param {fm.Action} action
+ * @param {fm.Action} trueBranch
+ * @param {fm.Action=} opt_falseBranch
+ * @return {fm.Action}
  */
 fm.if = function(action, trueBranch, opt_falseBranch) {
   return function(atom, complete, cancel) {
@@ -341,7 +398,7 @@ act.fs.readFilesTree = function(dirPath, complete, cancel) {
 
 /**
  * @param {string} command
- * @return {app.Action}
+ * @return {fm.Action}
  */
 act.proc.exec = function(command) {
   return function(opt_options, complete, cancel) {
@@ -361,7 +418,7 @@ act.proc.exec = function(command) {
 
 /**
  * @param {app.Module} module
- * @return {app.Action}
+ * @return {fm.Action}
  */
 act.gcc.makeSrcArgs = function(module) {
   /**
@@ -398,7 +455,7 @@ act.gcc.makeSrcArgs = function(module) {
 
 /**
  * @param {string} externsDir
- * @return {app.Action}
+ * @return {fm.Action}
  */
 act.gcc.makeExternsArgs = function(externsDir) {
   /**
@@ -430,7 +487,7 @@ act.gcc.makeExternsArgs = function(externsDir) {
 
 /**
  * @param {app.Module} module
- * @return {app.Action}
+ * @return {fm.Action}
  */
 act.gcc.makeOptionsArgs = function(module) {
   /**
@@ -605,7 +662,7 @@ act.cli.read = function(scheme, complete, cancel) {
  * @param {function(string, number=)} cancel
  */
 act.invoke = function(name, complete, cancel) {
-  act[name].call(app.__scheme, app.__scheme, function() {
+  act[name](null, function() {
     console.log(act.MESSAGES[name]);
     complete();
   }, cancel);
@@ -640,11 +697,11 @@ act.publish = fm.script([
 
 
 /**
- * @type {app.Action}
+ * @type {fm.Action}
  */
 var main = fm.script([
-  act.scheme.load,
-  act.cli.read,
+  dm.set('scheme', act.scheme.load),
+  dm.set('actionName', act.cli.read),
   act.invoke
 ]);
 
