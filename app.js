@@ -208,6 +208,7 @@ dm.set = function(key, action) {
   return function(input, complete, cancel) {
     action(input, function(data) {
       dm.__db[key] = data;
+      complete(data);
     }, cancel);
   }
 };
@@ -289,6 +290,18 @@ fm.if = function(action, trueBranch, opt_falseBranch) {
         }
       }
     }, cancel);
+  }
+};
+
+
+/**
+ * @param {fm.Action} action
+ * @param {...} args
+ * @return {fm.Action}
+ */
+fm.do = function(action, args) {
+  return function(input, complete, cancel) {
+    action(input)
   }
 };
 
@@ -422,7 +435,6 @@ act.proc.exec = function(command) {
  */
 act.gcc.makeSrcArgs = function(module) {
   /**
-   * @this {app.Scheme}
    * @param {string} args
    * @param {function(string)} complete
    * @param {function(string, number=)} cancel
@@ -532,11 +544,11 @@ act.gcc.invoke = function(args, complete, cancel) {
  */
 act.gcc.makeArgs = function(module, complete, cancel) {
   fm.script([
-    act.gcc.makeSrcArgs(module),
-    act.gcc.makeExternsArgs(NODE_EXTERNS_DIR),
-    act.gcc.makeExternsArgs(this['externs'] || ''),
-    act.gcc.makeOptionsArgs(module)
-  ]).call(this, '', complete, cancel);
+    fm.do(act.gcc.makeSrcArgs, '#srcDir', '#rootNamespace', module['src']),
+    fm.do(act.gcc.makeExternsArgs, NODE_EXTERNS_DIR),
+    fm.do(act.gcc.makeExternsArgs, '#externs'),
+    fm.do(act.gcc.makeOptionsArgs, '#compilerOpts', '#buildDir', module['name'])
+  ])('', complete, cancel);
 };
 
 
@@ -675,6 +687,7 @@ act.MESSAGES = {
 
 
 act.make = fm.script([
+  dm.get('scheme'),
   act.scheme.getModules,
 
   fm.each(fm.script([
