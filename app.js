@@ -25,6 +25,12 @@ var act = {};
 /**
  * @namespace
  */
+act.cli = {};
+
+
+/**
+ * @namespace
+ */
 act.fs = {};
 
 
@@ -478,6 +484,22 @@ act.gcc.makeArgs = function(module, complete, cancel) {
 
 
 /**
+ * @param {string} filename
+ * @param {function(app.Scheme)} complete
+ * @param {function(string, number=)} cancel
+ */
+act.scheme.load = function(filename, complete, cancel) {
+  act.fs.readFile({encoding: 'utf-8'})(filename, function(file) {
+    try {
+      complete(JSON.parse(file));
+    } catch(error) {
+      cancel('[act.scheme.load] parsing error: ' + error.toString());
+    }
+  }, cancel);
+};
+
+
+/**
  * @param {app.Scheme} scheme
  * @param {function(!Array.<app.Module>)} complete
  * @param {function(string, number=)} cancel
@@ -563,47 +585,31 @@ function usage() {
 
 
 /**
- * @param {string} name
- * @return {app.Action}
+ * @param {app.Scheme} scheme
+ * @param {function(string)} complete
+ * @param {function(string, number=)} cancel
  */
-function handleActionCompleted(name) {
-  return function() {
-    console.log(act.MESSAGES[name]);
-  }
-}
-
-
-/**
- *
- */
-function handleInput() {
-  console.log('handleInput: ', process.argv);
+act.cli.read = function(scheme, complete, cancel) {
   if (process.argv.length === 2 || typeof act[process.argv[2]] === 'function') {
-    var name = process.argv[2] || 'make';
-    act[name].call(app.__scheme, app.__scheme,
-        handleActionCompleted(name), console.log);
+    complete(process.argv[2] || 'make');
   } else {
     usage();
+    cancel('');
   }
-}
+};
 
 
 /**
- * @param {string} filename
+ * @param {string} name
  * @param {function()} complete
  * @param {function(string, number=)} cancel
  */
-function loadProjectScheme(filename, complete, cancel) {
-  console.log('loadProjectScheme:', filename);
-  act.fs.readFile({encoding: 'utf-8'})(filename, function(file) {
-    try {
-      app.__scheme = JSON.parse(file);
-      complete();
-    } catch(error) {
-      cancel('Scheme file parsing error: ' + error.toString());
-    }
+act.invoke = function(name, complete, cancel) {
+  act[name].call(app.__scheme, app.__scheme, function() {
+    console.log(act.MESSAGES[name]);
+    complete();
   }, cancel);
-}
+};
 
 
 act.MESSAGES = {
@@ -637,8 +643,9 @@ act.publish = fm.script([
  * @type {app.Action}
  */
 var main = fm.script([
-  loadProjectScheme,
-  handleInput
+  act.scheme.load,
+  act.cli.read,
+  act.invoke
 ]);
 
 
