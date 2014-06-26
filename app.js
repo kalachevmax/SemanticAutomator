@@ -43,7 +43,19 @@ act.gcc = {};
 /**
  * @namespace
  */
+act.git = {};
+
+
+/**
+ * @namespace
+ */
 act.scheme = {};
+
+
+/**
+ * @namespace
+ */
+act.dep = {};
 
 
 /**
@@ -74,6 +86,12 @@ var NODE_EXTERNS_DIR = DIRECTOR_DIR + '/externs';
  * @type {string}
  */
 var COMPILER_PATH = '/opt/closure-compiler.jar';
+
+
+/**
+ * @type {string}
+ */
+var DEPS_DIR = 'deps';
 
 
 /**
@@ -434,6 +452,16 @@ act.gcc.makeOptionsArgs = function(module) {
 
 
 /**
+ * @param {string} args
+ * @param {function()} complete
+ * @param {function(string, number=)} cancel
+ */
+act.gcc.invoke = function(args, complete, cancel) {
+  act.proc.exec(GCC + args)({}, complete, cancel);
+};
+
+
+/**
  * @this {app.Scheme}
  * @param {app.Module} module
  * @param {function(string)} complete
@@ -467,11 +495,22 @@ act.scheme.getModules = function(scheme, complete, cancel) {
  * @param {!Object.<string, !Object>} obj
  * @return {!Array.<!Object>}
  */
-act.scheme.__transformToArray = function(obj) {
+act.scheme.__depsToArray = function(obj) {
   var result = [];
 
   for (var name in obj) {
-    result.push(extend({ name: name}, obj[name]));
+    var item = {
+      name: name
+    };
+
+    if (obj[name] instanceof Object) {
+      item = extend(item, obj[name]);
+    } else if (typeof obj[name] === 'string') {
+      item.type = 'git';
+      item.repo = obj[name];
+    }
+
+    result.push(item);
   }
 
   return result;
@@ -485,10 +524,32 @@ act.scheme.__transformToArray = function(obj) {
  */
 act.scheme.getDeps = function(scheme, complete, cancel) {
   if (scheme['deps'] instanceof Object) {
-    complete(act.scheme.__transformToArray(scheme['deps']));
+    complete(act.scheme.__depsToArray(scheme['deps']));
   } else {
     cancel('[act.scheme.getDeps] missing deps section');
   }
+};
+
+
+/**
+ * @param {!Object} dep
+ * @param {function(!Object)} complete
+ * @param {function(string, number=)} cancel
+ */
+act.dep.update = function(dep, complete, cancel) {
+  if (dep['name'] === 'git') {
+    act.git.clone.call(this, dep['repo'], complete, cancel)
+  }
+};
+
+
+/**
+ * @param {string} repo
+ * @param {function()} complete
+ * @param {function(string, number=)} cancel
+ */
+act.git.clone = function(repo, complete, cancel) {
+  act.proc.exec('git clone ' + repo + DEPS_DIR)({}, complete, cancel);
 };
 
 
@@ -555,14 +616,14 @@ act.make = fm.script([
 
   fm.each(fm.script([
     act.gcc.makeArgs,
-    act.proc.exec(GCC)
+    act.gcc.invoke
   ]))
 ]);
 
 
 act.update = fm.script([
   act.scheme.getDeps,
-  fm.each(act.git.clone)
+  fm.each(act.dep.update)
 ]);
 
 
