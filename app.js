@@ -31,6 +31,12 @@ act.fs = {};
 /**
  * @namespace
  */
+act.proc = {};
+
+
+/**
+ * @namespace
+ */
 act.gcc = {};
 
 
@@ -68,6 +74,12 @@ var NODE_EXTERNS_DIR = DIRECTOR_DIR + '/externs';
  * @type {string}
  */
 var COMPILER_PATH = '/opt/closure-compiler.jar';
+
+
+/**
+ * @type {string}
+ */
+var GCC = 'java -jar ' + COMPILER_PATH;
 
 
 /**
@@ -290,6 +302,26 @@ act.fs.readFilesTree = function(dirPath, complete, cancel) {
 
 
 /**
+ * @param {string} command
+ * @return {app.Action}
+ */
+act.proc.exec = function(command) {
+  return function(opt_options, complete, cancel) {
+    childProcess.exec(command, opt_options, function (error, stdout, stderr) {
+      console.log(stdout);
+      console.log(stderr);
+
+      if (error === null) {
+        complete();
+      } else {
+        cancel('[act.proc.exec]: ' + error.toString());
+      }
+    });
+  }
+};
+
+
+/**
  * @param {app.Module} module
  * @return {app.Action}
  */
@@ -404,29 +436,6 @@ act.gcc.makeArgs = function(module, complete, cancel) {
 
 
 /**
- * @param {string} args
- * @param {function()} complete
- * @param {function(string, number=)} cancel
- */
-act.gcc.invoke = function(args, complete, cancel) {
-  console.log('act.gcc.invoke:', args);
-
-  function handleCompleted(err, stdout, stderr) {
-    console.log(stdout);
-    console.log(stderr);
-
-    if (err === null) {
-      complete();
-    } else {
-      cancel('[act.gcc.invoke]: ' + err.toString());
-    }
-  }
-
-  childProcess.exec('java -jar ' + COMPILER_PATH + args, handleCompleted);
-};
-
-
-/**
  * @param {app.Scheme} scheme
  * @param {function(!Array.<app.Module>)} complete
  * @param {function(string, number=)} cancel
@@ -503,7 +512,7 @@ act.make = fm.script([
 
   fm.each(fm.script([
     act.gcc.makeArgs,
-    act.gcc.invoke
+    act.proc.exec(GCC)
   ]))
 ]);
 
