@@ -127,7 +127,7 @@ var DEPS_DIR = 'deps';
 /**
  * @type {string}
  */
-var GCC = 'java -jar ' + COMPILER_PATH;
+var GCC_COMMAND = 'java -jar ' + COMPILER_PATH;
 
 
 /**
@@ -178,6 +178,15 @@ function extend(base, obj) {
  * @type {!Object.<string, fm.Input>}
  */
 dm.__db = {};
+
+
+/**
+ * @param {string} key
+ * @param {fm.Input} value
+ */
+dm.const = function(key, value) {
+  dm.__db[key] = value;
+};
 
 
 /**
@@ -539,18 +548,26 @@ app.act.gcc.makeArgs = function(_, complete, cancel) {
 
 
 /**
- * @param {string} filename
- * @param {function(app.Scheme)} complete
- * @param {function(string, number=)} cancel
+ * @param {string} key
+ * @return {fm.Action}
  */
-app.act.scheme.load = function(filename, complete, cancel) {
-  act.fs.readFile({encoding: 'utf-8'})(filename, function(file) {
-    try {
-      complete(JSON.parse(file));
-    } catch(error) {
-      cancel('[act.scheme.load] parsing error: ' + error.toString());
-    }
-  }, cancel);
+app.act.scheme.load = function(key) {
+  var filename = dm.get(key) || '';
+
+  /**
+   * @param {string} filename
+   * @param {function(app.Scheme)} complete
+   * @param {function(string, number=)} cancel
+   */
+  return function(_, complete, cancel) {
+    act.fs.readFile({encoding: 'utf-8'})(filename, function (file) {
+      try {
+        complete(JSON.parse(file));
+      } catch (error) {
+        cancel('[app.act.scheme.load] parsing error: ' + error.toString());
+      }
+    }, cancel);
+  }
 };
 
 
@@ -711,11 +728,23 @@ cmd.act.publish = fm.script([
 ]);
 
 
+/**
+ * @type {fm.Action}
+ */
+app.setup = fm.script([
+  dm.const('scheme.filename', SCHEME_FILE_NAME),
+  dm.const('node.externs.dir', NODE_EXTERNS_DIR),
+  dm.const('gcc.command', GCC_COMMAND),
+  dm.const('deps.dir', DEPS_DIR)
+]);
+
 
 /**
  * @type {fm.Action}
  */
 app.main = fm.script([
+  app.setup,
+
   app.act.scheme.load('scheme.filename'),
   dm.set('scheme'),
 
@@ -726,4 +755,4 @@ app.main = fm.script([
 ]);
 
 
-app.main(nop, console.log);
+app.main('', nop, console.log);
