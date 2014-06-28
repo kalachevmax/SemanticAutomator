@@ -13,6 +13,54 @@ var app = {};
 /**
  * @namespace
  */
+app.act = {};
+
+
+/**
+ * @namespace
+ */
+app.act.cli = {};
+
+
+/**
+ * @namespace
+ */
+app.act.gcc = {};
+
+
+/**
+ * @namespace
+ */
+app.act.git = {};
+
+
+/**
+ * @namespace
+ */
+app.act.scheme = {};
+
+
+/**
+ * @namespace
+ */
+app.act.dep = {};
+
+
+/**
+ * @namespace
+ */
+app.act.cmd = {};
+
+
+/**
+ * @namespace
+ */
+var cmd = {};
+
+
+/**
+ * @namespace
+ */
 var fm = {};
 
 
@@ -31,12 +79,6 @@ var act = {};
 /**
  * @namespace
  */
-act.cli = {};
-
-
-/**
- * @namespace
- */
 act.fs = {};
 
 
@@ -44,30 +86,6 @@ act.fs = {};
  * @namespace
  */
 act.proc = {};
-
-
-/**
- * @namespace
- */
-act.gcc = {};
-
-
-/**
- * @namespace
- */
-act.git = {};
-
-
-/**
- * @namespace
- */
-act.scheme = {};
-
-
-/**
- * @namespace
- */
-act.dep = {};
 
 
 /**
@@ -137,18 +155,6 @@ app.Module;
 
 
 /**
- * @type {app.Scheme}
- */
-app.__scheme = null;
-
-
-/**
- * @type {!Object.<string, fm.Action>}
- */
-app.acts = {};
-
-
-/**
  *
  */
 function nop() {}
@@ -176,40 +182,26 @@ dm.__db = {};
 
 /**
  * @param {string} key
- * @return {fm.Action}
+ * @return {fm.Input}
  */
 dm.get = function(key) {
-  /**
-   * @param {fm.Input} _
-   * @param {function(fm.Input)} complete
-   * @param {function(string, number=)} cancel
-   */
-  return function (_, complete, cancel) {
-    if (typeof dm.__db[key] !== 'undefined') {
-      complete(dm.__db[key]);
-    } else {
-      cancel('[dm.get] key ' + key + 'does not exists on storage');
-    }
-  };
+  return dm.__db[key] || null;
 };
 
 
 /**
  * @param {string} key
- * @param {fm.Action} action
  * @return {fm.Action}
  */
-dm.set = function(key, action) {
+dm.set = function(key) {
   /**
    * @param {fm.Input} input
    * @param {function(fm.Input)} complete
    * @param {function(string, number=)} cancel
    */
-  return function(input, complete, cancel) {
-    action(input, function(data) {
-      dm.__db[key] = data;
-      complete(data);
-    }, cancel);
+  return function(value, complete, cancel) {
+    dm.__db[key] = value;
+    complete(value);
   }
 };
 
@@ -290,18 +282,6 @@ fm.if = function(action, trueBranch, opt_falseBranch) {
         }
       }
     }, cancel);
-  }
-};
-
-
-/**
- * @param {fm.Action} action
- * @param {...} args
- * @return {fm.Action}
- */
-fm.do = function(action, args) {
-  return function(input, complete, cancel) {
-    action(input)
   }
 };
 
@@ -430,17 +410,20 @@ act.proc.exec = function(command) {
 
 
 /**
- * @param {app.Module} module
+ * @param {string} schemeKey
+ * @param {string} moduleKey
  * @return {fm.Action}
  */
-act.gcc.makeSrcArgs = function(module) {
+app.act.gcc.makeSrcArgs = function(schemeKey, moduleKey) {
+  var scheme = dm.get(schemeKey) || {};
+  var module = dm.get(moduleKey) || {};
+
   /**
    * @param {string} args
    * @param {function(string)} complete
    * @param {function(string, number=)} cancel
    */
-  return function (args, complete, cancel) {
-    var scheme = this;
+  return function(args, complete, cancel) {
     var srcDir = scheme['srcDir'];
     var rootNamespace = scheme['rootNamespace'];
     var filenames = module['src'];
@@ -466,10 +449,12 @@ act.gcc.makeSrcArgs = function(module) {
 
 
 /**
- * @param {string} externsDir
+ * @param {string} externsDirKey
  * @return {fm.Action}
  */
-act.gcc.makeExternsArgs = function(externsDir) {
+app.act.gcc.makeExternsArgs = function(externsDirKey) {
+  var externsDir = dm.get(externsDirKey) || '';
+
   /**
    * @param {string} args
    * @param {function(string)} complete
@@ -498,21 +483,23 @@ act.gcc.makeExternsArgs = function(externsDir) {
 
 
 /**
- * @param {app.Module} module
+ * @param {string} schemeKey
+ * @param {string} moduleKey
  * @return {fm.Action}
  */
-act.gcc.makeOptionsArgs = function(module) {
+app.act.gcc.makeOptionsArgs = function(schemeKey, moduleKey) {
+  var scheme = dm.get(schemeKey) || {};
+  var module = dm.get(moduleKey) || {};
+
   /**
-   * @this {app.Scheme}
    * @param {string} args
    * @param {function(string)} complete
    * @param {function(string, number=)} cancel
    */
   return function(args, complete, cancel) {
-    var scheme = this;
     var options = scheme['compilerOptions'];
 
-    args += ' --js_output_file ' + path.join(scheme['buildDir'], module['name']) + '.js';
+    args += ' --js_output_file ' + path.join(scheme['buildDir'], module['name'] || 'app') + '.js';
     args += ' --compilation_level ' + (options['compilationLevel'] || 'WHITESPACE_ONLY');
     args += ' --warning_level=' + (options['warningLevel'] || 'VERBOSE');
     args += ' --language_in=' + (options['language'] || 'ECMASCRIPT5');
@@ -531,23 +518,22 @@ act.gcc.makeOptionsArgs = function(module) {
  * @param {function()} complete
  * @param {function(string, number=)} cancel
  */
-act.gcc.invoke = function(args, complete, cancel) {
+app.act.gcc.invoke = function(args, complete, cancel) {
   act.proc.exec(GCC + args)({}, complete, cancel);
 };
 
 
 /**
- * @this {app.Scheme}
- * @param {app.Module} module
+ * @param {*} _
  * @param {function(string)} complete
  * @param {function(string, number=)} cancel
  */
-act.gcc.makeArgs = function(module, complete, cancel) {
+app.act.gcc.makeArgs = function(_, complete, cancel) {
   fm.script([
-    fm.do(act.gcc.makeSrcArgs, '#srcDir', '#rootNamespace', module['src']),
-    fm.do(act.gcc.makeExternsArgs, NODE_EXTERNS_DIR),
-    fm.do(act.gcc.makeExternsArgs, '#externs'),
-    fm.do(act.gcc.makeOptionsArgs, '#compilerOpts', '#buildDir', module['name'])
+    act.gcc.makeSrcArgs('scheme', 'currentModule'),
+    act.gcc.makeExternsArgs('nodeExternsDir'),
+    act.gcc.makeExternsArgs('externsDir'),
+    act.gcc.makeOptionsArgs('scheme', 'currentModule')
   ])('', complete, cancel);
 };
 
@@ -557,7 +543,7 @@ act.gcc.makeArgs = function(module, complete, cancel) {
  * @param {function(app.Scheme)} complete
  * @param {function(string, number=)} cancel
  */
-act.scheme.load = function(filename, complete, cancel) {
+app.act.scheme.load = function(filename, complete, cancel) {
   act.fs.readFile({encoding: 'utf-8'})(filename, function(file) {
     try {
       complete(JSON.parse(file));
@@ -569,15 +555,23 @@ act.scheme.load = function(filename, complete, cancel) {
 
 
 /**
- * @param {app.Scheme} scheme
- * @param {function(!Array.<app.Module>)} complete
- * @param {function(string, number=)} cancel
+ * @param {string} key
+ * @return {fm.Action}
  */
-act.scheme.getModules = function(scheme, complete, cancel) {
-  if (scheme['modules'] instanceof Array) {
-    complete(scheme['modules']);
-  } else {
-    cancel('[act.scheme.getModules] missing modules section');
+app.act.scheme.getModules = function(key) {
+  var scheme = dm.get(key);
+
+  /**
+   * @param {*} _
+   * @param {function(!Array.<app.Module>)} complete
+   * @param {function(string, number=)} cancel
+   */
+  return function(_, complete, cancel) {
+    if (scheme['modules'] instanceof Array) {
+      complete(scheme['modules']);
+    } else {
+      cancel('[act.scheme.getModules] missing modules section');
+    }
   }
 };
 
@@ -586,7 +580,7 @@ act.scheme.getModules = function(scheme, complete, cancel) {
  * @param {!Object.<string, !Object>} obj
  * @return {!Array.<!Object>}
  */
-act.scheme.__depsToArray = function(obj) {
+app.act.scheme.__depsToArray = function(obj) {
   var result = [];
 
   for (var name in obj) {
@@ -613,9 +607,9 @@ act.scheme.__depsToArray = function(obj) {
  * @param {function(!Array.<!Object>)} complete
  * @param {function(string, number=)} cancel
  */
-act.scheme.getDeps = function(scheme, complete, cancel) {
+app.act.scheme.getDeps = function(scheme, complete, cancel) {
   if (scheme['deps'] instanceof Object) {
-    complete(act.scheme.__depsToArray(scheme['deps']));
+    complete(app.act.scheme.__depsToArray(scheme['deps']));
   } else {
     cancel('[act.scheme.getDeps] missing deps section');
   }
@@ -627,9 +621,9 @@ act.scheme.getDeps = function(scheme, complete, cancel) {
  * @param {function(!Object)} complete
  * @param {function(string, number=)} cancel
  */
-act.dep.update = function(dep, complete, cancel) {
+app.act.dep.update = function(dep, complete, cancel) {
   if (dep['name'] === 'git') {
-    act.git.clone.call(this, dep['repo'], complete, cancel)
+    app.act.git.clone(dep['repo'], complete, cancel)
   }
 };
 
@@ -639,7 +633,7 @@ act.dep.update = function(dep, complete, cancel) {
  * @param {function()} complete
  * @param {function(string, number=)} cancel
  */
-act.git.clone = function(repo, complete, cancel) {
+app.act.git.clone = function(repo, complete, cancel) {
   act.proc.exec('git clone ' + repo + DEPS_DIR)({}, complete, cancel);
 };
 
@@ -647,10 +641,10 @@ act.git.clone = function(repo, complete, cancel) {
 /**
  *
  */
-function usage() {
+app.usage = function() {
   console.log('usage: app action');
   console.log('action = make|update|publish');
-}
+};
 
 
 /**
@@ -658,11 +652,11 @@ function usage() {
  * @param {function(string)} complete
  * @param {function(string, number=)} cancel
  */
-act.cli.read = function(scheme, complete, cancel) {
+app.act.cli.read = function(scheme, complete, cancel) {
   if (process.argv.length === 2 || typeof act[process.argv[2]] === 'function') {
     complete(process.argv[2] || 'make');
   } else {
-    usage();
+    app.usage();
     cancel('');
   }
 };
@@ -673,37 +667,46 @@ act.cli.read = function(scheme, complete, cancel) {
  * @param {function()} complete
  * @param {function(string, number=)} cancel
  */
-act.invoke = function(name, complete, cancel) {
-  act[name](null, function() {
-    console.log(act.MESSAGES[name]);
+app.act.cmd.invoke = function(name, complete, cancel) {
+  cmd[name](null, function() {
+    console.log(cmd.MESSAGES[name]);
     complete();
   }, cancel);
 };
 
 
-act.MESSAGES = {
+cmd.MESSAGES = {
   make: 'The application has been successfully built'
 };
 
 
-act.make = fm.script([
-  dm.get('scheme'),
-  act.scheme.getModules,
+cmd.make = fm.script([
+  app.act.get('node.externs.dir'),
+  dm.set('node.externs.dir'),
+
+  app.act.scheme.get('externs'),
+  dm.set('externs.dir'),
+
+  app.act.scheme.getModules('scheme'),
 
   fm.each(fm.script([
-    act.gcc.makeArgs,
-    act.gcc.invoke
+    dm.set('module.current'),
+    app.act.gcc.makeArgs,
+    app.act.gcc.invoke
   ]))
 ]);
 
 
-act.update = fm.script([
-  act.scheme.getDeps,
-  fm.each(act.dep.update)
+cmd.update = fm.script([
+  app.act.scheme.getDeps,
+  fm.each(fm.script([
+    dm.set('dep.current'),
+    app.act.dep.update
+  ]))
 ]);
 
 
-act.publish = fm.script([
+cmd.act.publish = fm.script([
 
 ]);
 
@@ -712,11 +715,15 @@ act.publish = fm.script([
 /**
  * @type {fm.Action}
  */
-var main = fm.script([
-  dm.set('scheme', act.scheme.load),
-  dm.set('actionName', act.cli.read),
-  act.invoke
+app.main = fm.script([
+  app.act.scheme.load('scheme.filename'),
+  dm.set('scheme'),
+
+  app.act.cli.read,
+  dm.set('action.name'),
+
+  app.act.cmd.invoke
 ]);
 
 
-main(SCHEME_FILE_NAME, nop, console.log);
+app.main(nop, console.log);
