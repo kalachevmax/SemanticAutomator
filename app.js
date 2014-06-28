@@ -49,6 +49,12 @@ app.act.dep = {};
 /**
  * @namespace
  */
+app.act.module = {};
+
+
+/**
+ * @namespace
+ */
 app.act.cmd = {};
 
 
@@ -68,6 +74,18 @@ var fm = {};
  * @namespace
  */
 var dm = {};
+
+
+/**
+ * @namespace
+ */
+var utils = {};
+
+
+/**
+ * @namespace
+ */
+utils.obj = {};
 
 
 /**
@@ -137,15 +155,15 @@ app.Scheme;
 
 
 /**
- * @typedef {function(*, !Function, !Function)}
- */
-fm.Action;
-
-
-/**
  * @typedef {*}
  */
 fm.Input;
+
+
+/**
+ * @typedef {function(!Function, !Function, fm.Input=)}
+ */
+fm.Action;
 
 
 /**
@@ -155,9 +173,9 @@ app.Module;
 
 
 /**
- *
+ * @type {!Function}
  */
-function nop() {}
+utils.nop = function() {};
 
 
 /**
@@ -165,13 +183,13 @@ function nop() {}
  * @param {!Object} obj
  * @return {!Object}
  */
-function extend(base, obj) {
+utils.obj.extend = function(base, obj) {
   for (var key in obj) {
     base[key] = obj[key];
   }
 
   return base;
-}
+};
 
 
 /**
@@ -184,7 +202,7 @@ dm.__db = {};
  * @param {string} key
  * @param {fm.Input} value
  */
-dm.const = function(key, value) {
+dm.set = function(key, value) {
   dm.__db[key] = value;
 };
 
@@ -200,17 +218,18 @@ dm.get = function(key) {
 
 /**
  * @param {string} key
+ * @param {fm.Input=} opt_value
  * @return {fm.Action}
  */
-dm.set = function(key) {
+dm.assign = function(key, opt_value) {
   /**
    * @param {fm.Input} input
    * @param {function(fm.Input)} complete
    * @param {function(string, number=)} cancel
    */
-  return function(value, complete, cancel) {
-    dm.__db[key] = value;
-    complete(value);
+  return function(input, complete, cancel) {
+    dm.__db[key] = opt_value || input;
+    complete(input);
   }
 };
 
@@ -220,12 +239,11 @@ dm.set = function(key) {
  * @return {fm.Action}
  */
 fm.script = function(actions) {
-  return function(input, complete, cancel) {
-    var context = this;
+  return function(complete, cancel, opt_input) {
     var localActions = actions.slice(0);
 
     function process(action, accumulator) {
-      action.call(context, accumulator, handleAction, cancel);
+      action(handleAction, cancel, accumulator);
     }
 
     function handleAction(result) {
@@ -240,7 +258,7 @@ fm.script = function(actions) {
       }
     }
 
-    fold(input);
+    fold(opt_input);
   }
 };
 
@@ -418,21 +436,30 @@ act.proc.exec = function(command) {
 };
 
 
-/**
- * @param {string} schemeKey
- * @param {string} moduleKey
- * @return {fm.Action}
- */
-app.act.gcc.makeSrcArgs = function(schemeKey, moduleKey) {
-  var scheme = dm.get(schemeKey) || {};
-  var module = dm.get(moduleKey) || {};
+app.act.module.set = function(key) {
+  var scheme = dm.get('scheme') || {};
+  var module = dm.get('module') || {};
+  var externsNodeDir = dm.get('externs.node.dir') || '';
+  var externsAppDir = dm.get('externs.dir') || '';
+
 
   /**
-   * @param {string} args
-   * @param {function(string)} complete
+   * @type {fm.Action}
+   */
+  var args = fm.script([
+    app.act.module.set('args.src'),
+    app.act.module.set('args.externs.node'),
+    app.act.module.set('args.externs.app'),
+    app.act.module.set('args.options'),
+    app.act.module.set('args.full')
+  ]);
+
+
+  /**
+   * @param {function()} complete
    * @param {function(string, number=)} cancel
    */
-  return function(args, complete, cancel) {
+  var argsSrc = function(complete, cancel) {
     var srcDir = scheme['srcDir'];
     var rootNamespace = scheme['rootNamespace'];
     var filenames = module['src'];
@@ -444,69 +471,58 @@ app.act.gcc.makeSrcArgs = function(schemeKey, moduleKey) {
       var i = 0,
           l = filenames.length;
 
+      var args = '';
+
       while (i < l) {
         args += ' --js ' + path.join(srcDir, rootNamespace, filenames[i]);
         i += 1;
       }
 
-      complete(args);
+      dm.set('module.args.src', args);
+      complete();
     } else {
-      cancel('[act.gcc.makeSrcArgs] missing section: srcDir|rootNamespace|module.src');
+      cancel('[app.act.module.set] missing section: srcDir|rootNamespace|module.src');
     }
-  }
-};
+  };
 
-
-/**
- * @param {string} externsDirKey
- * @return {fm.Action}
- */
-app.act.gcc.makeExternsArgs = function(externsDirKey) {
-  var externsDir = dm.get(externsDirKey) || '';
 
   /**
-   * @param {string} args
-   * @param {function(string)} complete
-   * @param {function(string, number=)} cancel
+   * @param {string} dir
+   * @return {fm.Action}
    */
-  return function(args, complete, cancel) {
-    if (externsDir !== '') {
-      act.fs.readFilesTree(externsDir, handleReaded, cancel);
-    } else {
-      cancel('[act.gcc.makeExternsArgs] missing externs section');
-    }
-
-    function handleReaded(filenames) {
-      var i = 0,
-          l = filenames.length;
-
-      while (i < l) {
-        args += ' --externs ' + filenames[i];
-        i += 1;
+  var argsExterns = function(dir) {
+    return function(complete, cancel) {
+      if (dir !== '') {
+        act.fs.readFilesTree(dir, handleReaded, cancel);
+      } else {
+        cancel('[app.act.module.set] missing ' + dir + 'section');
       }
 
-      complete(args)
+      function handleReaded(filenames) {
+        var i = 0,
+            l = filenames.length;
+
+        var args = '';
+
+        while (i < l) {
+          args += ' --externs ' + filenames[i];
+          i += 1;
+        }
+
+        dm.set('module.args.externs', args);
+        complete()
+      }
     }
-  }
-};
+  };
 
-
-/**
- * @param {string} schemeKey
- * @param {string} moduleKey
- * @return {fm.Action}
- */
-app.act.gcc.makeOptionsArgs = function(schemeKey, moduleKey) {
-  var scheme = dm.get(schemeKey) || {};
-  var module = dm.get(moduleKey) || {};
 
   /**
-   * @param {string} args
-   * @param {function(string)} complete
+   * @param {function()} complete
    * @param {function(string, number=)} cancel
    */
-  return function(args, complete, cancel) {
+  var argsOptions = function(complete, cancel) {
     var options = scheme['compilerOptions'];
+    var args = '';
 
     args += ' --js_output_file ' + path.join(scheme['buildDir'], module['name'] || 'app') + '.js';
     args += ' --compilation_level ' + (options['compilationLevel'] || 'WHITESPACE_ONLY');
@@ -517,33 +533,47 @@ app.act.gcc.makeOptionsArgs = function(schemeKey, moduleKey) {
       args += ' --formatting=' + options['formatting'];
     }
 
-    complete(args);
-  }
+    dm.set('module.args.options', args);
+    complete();
+  };
+
+
+  var argsFull = function(complete, cancel) {
+    var args = module['args'];
+
+    dm.set('module.args.full',
+        dm.get('module.args.src') +
+        dm.get('module.args.externs') +
+        dm.get('module.args.externs') +
+        dm.get('module.args.options'));
+
+    complete();
+  };
+
+
+  var set = {
+    'args': args,
+    'args.src': argsSrc,
+    'args.externs.node': argsExterns(externsNodeDir),
+    'args.externs.app': argsExterns(externsAppDir),
+    'args.options': argsOptions,
+    'args.full': argsFull
+  };
+
+  return set[key];
 };
 
 
 /**
- * @param {string} args
  * @param {function()} complete
  * @param {function(string, number=)} cancel
  */
-app.act.gcc.invoke = function(args, complete, cancel) {
-  act.proc.exec(GCC + args)({}, complete, cancel);
-};
+app.act.module.make = function(complete, cancel) {
+  var gccCommand = dm.get('gcc.command');
+  var module = dm.get('module');
+  var args = dm.get('module.args.full');
 
-
-/**
- * @param {*} _
- * @param {function(string)} complete
- * @param {function(string, number=)} cancel
- */
-app.act.gcc.makeArgs = function(_, complete, cancel) {
-  fm.script([
-    act.gcc.makeSrcArgs('scheme', 'currentModule'),
-    act.gcc.makeExternsArgs('nodeExternsDir'),
-    act.gcc.makeExternsArgs('externsDir'),
-    act.gcc.makeOptionsArgs('scheme', 'currentModule')
-  ])('', complete, cancel);
+  act.proc.exec(gccCommand + args)({}, complete, cancel);
 };
 
 
@@ -606,7 +636,7 @@ app.act.scheme.__depsToArray = function(obj) {
     };
 
     if (obj[name] instanceof Object) {
-      item = extend(item, obj[name]);
+      item = utils.obj.extend(item, obj[name]);
     } else if (typeof obj[name] === 'string') {
       item.type = 'git';
       item.repo = obj[name];
@@ -620,16 +650,25 @@ app.act.scheme.__depsToArray = function(obj) {
 
 
 /**
- * @param {app.Scheme} scheme
- * @param {function(!Array.<!Object>)} complete
- * @param {function(string, number=)} cancel
+ * @param {string} key
+ * @return {fm.Action}
  */
-app.act.scheme.getDeps = function(scheme, complete, cancel) {
-  if (scheme['deps'] instanceof Object) {
-    complete(app.act.scheme.__depsToArray(scheme['deps']));
-  } else {
-    cancel('[act.scheme.getDeps] missing deps section');
+app.act.scheme.get = function(key) {
+  var scheme = dm.get('scheme');
+
+  /**
+   * @param {function()} complete
+   * @param {function(string, number=)} cancel
+   */
+  function get(complete, cancel) {
+    if (scheme[key] instanceof Object) {
+      complete();
+    } else {
+      cancel('[app.act.scheme.get] missing ' + key + ' section');
+    }
   }
+
+  return get;
 };
 
 
@@ -656,7 +695,7 @@ app.act.git.clone = function(repo, complete, cancel) {
 
 
 /**
- *
+ * @type {!Function}
  */
 app.usage = function() {
   console.log('usage: app action');
@@ -685,7 +724,7 @@ app.act.cli.read = function(scheme, complete, cancel) {
  * @param {function(string, number=)} cancel
  */
 app.act.cmd.invoke = function(name, complete, cancel) {
-  cmd[name](null, function() {
+  cmd[name](function() {
     console.log(cmd.MESSAGES[name]);
     complete();
   }, cancel);
@@ -698,26 +737,23 @@ cmd.MESSAGES = {
 
 
 cmd.make = fm.script([
-  app.act.get('node.externs.dir'),
-  dm.set('node.externs.dir'),
-
   app.act.scheme.get('externs'),
   dm.set('externs.dir'),
 
-  app.act.scheme.getModules('scheme'),
+  app.act.scheme.get('modules'),
 
   fm.each(fm.script([
-    dm.set('module.current'),
-    app.act.gcc.makeArgs,
-    app.act.gcc.invoke
+    dm.set('module'),
+    app.act.module.set('args')('scheme'),
+    app.act.module.make
   ]))
 ]);
 
 
 cmd.update = fm.script([
-  app.act.scheme.getDeps,
+  app.act.scheme.get('deps'),
   fm.each(fm.script([
-    dm.set('dep.current'),
+    dm.set('dep'),
     app.act.dep.update
   ]))
 ]);
@@ -732,10 +768,10 @@ cmd.act.publish = fm.script([
  * @type {fm.Action}
  */
 app.setup = fm.script([
-  dm.const('scheme.filename', SCHEME_FILE_NAME),
-  dm.const('node.externs.dir', NODE_EXTERNS_DIR),
-  dm.const('gcc.command', GCC_COMMAND),
-  dm.const('deps.dir', DEPS_DIR)
+  dm.assign('scheme.filename', SCHEME_FILE_NAME),
+  dm.assign('node.externs.dir', NODE_EXTERNS_DIR),
+  dm.assign('gcc.command', GCC_COMMAND),
+  dm.assign('deps.dir', DEPS_DIR)
 ]);
 
 
@@ -746,13 +782,13 @@ app.main = fm.script([
   app.setup,
 
   app.act.scheme.load('scheme.filename'),
-  dm.set('scheme'),
+  dm.assign('scheme'),
 
   app.act.cli.read,
-  dm.set('action.name'),
+  dm.assign('action.name'),
 
   app.act.cmd.invoke
 ]);
 
 
-app.main('', nop, console.log);
+app.main(utils.nop, console.log);
