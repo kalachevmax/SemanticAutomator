@@ -203,7 +203,7 @@ fm.set = function(key, value) {
 
 /**
  * @param {string} key
- * @param {string} opt_subkey
+ * @param {string=} opt_subkey
  * @return {fm.Input}
  */
 fm.get = function(key, opt_subkey) {
@@ -531,26 +531,19 @@ app.act.scheme.get = function(key) {
 
 
 /**
- * @param {string} key
- * @return {fm.Action}
+ * @param {function(app.Scheme)} complete
+ * @param {function(string, number=)} cancel
  */
-app.act.scheme.load = function(key) {
-  var filename = fm.get(key) || '';
+app.act.scheme.load = function(complete, cancel) {
+  var filename = fm.get('scheme.filename');
 
-  /**
-   * @param {string} filename
-   * @param {function(app.Scheme)} complete
-   * @param {function(string, number=)} cancel
-   */
-  return function(_, complete, cancel) {
-    act.fs.readFile({encoding: 'utf-8'})(filename, function (file) {
-      try {
-        complete(JSON.parse(file));
-      } catch (error) {
-        cancel('[app.act.scheme.load] parsing error: ' + error.toString());
-      }
-    }, cancel);
-  }
+  act.fs.readFile({encoding: 'utf-8'})(filename, function (file) {
+    try {
+      complete(JSON.parse(file));
+    } catch (error) {
+      cancel('[app.act.scheme.load] parsing error: ' + error.toString());
+    }
+  }, cancel);
 };
 
 
@@ -626,7 +619,7 @@ app.act.gcc.set = function(key) {
   function generateSrcArgs(complete, cancel, args) {
     var srcDir = fm.get('scheme', 'srcDir');
     var rootNamespace = fm.get('scheme', 'rootNamespace');
-    var filesnames = fm.get('module', 'src');
+    var filenames = fm.get('module', 'src');
 
     var i = 0,
         l = filenames.length;
@@ -669,6 +662,10 @@ app.act.gcc.set = function(key) {
    * @param {string} args
    */
   function generateOptionsArgs(complete, cancel, args) {
+    var options = fm.get('scheme', 'compilerOptions');
+    var buildDir = fm.get('scheme', 'buildDir');
+    var moduleName = fm.get('module', 'name');
+
     args += ' --js_output_file ' + path.join(buildDir, moduleName || 'app') + '.js';
     args += ' --compilation_level ' + (options['compilationLevel'] || 'WHITESPACE_ONLY');
     args += ' --warning_level=' + (options['warningLevel'] || 'VERBOSE');
@@ -697,24 +694,26 @@ app.act.gcc.invoke = function(complete, cancel) {
 
 
 /**
- * @param {!Object} dep
  * @param {function(!Object)} complete
  * @param {function(string, number=)} cancel
  */
-app.act.dep.update = function(dep, complete, cancel) {
+app.act.dep.update = function(complete, cancel) {
+  var dep = fm.get('dep');
+
   if (dep['name'] === 'git') {
-    app.act.git.clone(dep['repo'], complete, cancel)
+    app.act.git.clone(complete, cancel, dep['repo'])
   }
 };
 
 
 /**
- * @param {string} repo
  * @param {function()} complete
  * @param {function(string, number=)} cancel
+ * @param {string} repo
  */
-app.act.git.clone = function(repo, complete, cancel) {
-  act.proc.exec('git clone ' + repo + DEPS_DIR)({}, complete, cancel);
+app.act.git.clone = function(complete, cancel, repo) {
+  var depsDir = fm.get('deps.dir');
+  act.proc.exec('git clone ' + repo + depsDir)({}, complete, cancel);
 };
 
 
@@ -761,15 +760,12 @@ cmd.MESSAGES = {
 
 
 cmd.make = fm.script([
-  app.act.scheme.get('externs'),
-  fm.assign('externs.dir'),
-
   app.act.scheme.get('modules'),
 
   fm.each(fm.script([
     fm.assign('module'),
-    app.act.module.set('args')('scheme'),
-    app.act.module.make
+    app.act.gcc.set('args'),
+    app.act.gcc.invoke
   ]))
 ]);
 
@@ -805,7 +801,8 @@ app.setup = fm.script([
 app.main = fm.script([
   app.setup,
 
-  app.act.scheme.load('scheme.filename'),
+  fm.assert('scheme.filename'),
+  app.act.scheme.load,
   fm.assign('scheme'),
 
   app.act.cli.read,
