@@ -203,10 +203,15 @@ fm.set = function(key, value) {
 
 /**
  * @param {string} key
+ * @param {string} opt_subkey
  * @return {fm.Input}
  */
-fm.get = function(key) {
-  return fm.__dm[key] || null;
+fm.get = function(key, opt_subkey) {
+  if (fm.__dm[key] instanceof Object) {
+    return fm.__dm[key][opt_subkey] || null;
+  } else {
+    return fm.__dm[key] || null;
+  }
 };
 
 
@@ -224,6 +229,21 @@ fm.assign = function(key, opt_value) {
   return function(input, complete, cancel) {
     fm.__dm[key] = opt_value || input;
     complete(input);
+  }
+};
+
+
+/**
+ * @param {string} key
+ * @param {string} subkeyOrType
+ * @param {string|!Function} type
+ */
+fm.assert = function(key, subkeyOrType, type) {
+  return function(complete, cancel) {
+    if (arguments.length === 2) {
+      if (typeof subkeyOrType === 'string') {
+      }
+    }
   }
 };
 
@@ -430,144 +450,26 @@ act.proc.exec = function(command) {
 };
 
 
-app.act.module.set = function(key) {
-  var scheme = fm.get('scheme') || {};
-  var module = fm.get('module') || {};
-  var externsNodeDir = fm.get('externs.node.dir') || '';
-  var externsAppDir = fm.get('externs.dir') || '';
-
-
-  /**
-   * @type {fm.Action}
-   */
-  var args = fm.script([
-    app.act.module.set('args.src'),
-    app.act.module.set('args.externs.node'),
-    app.act.module.set('args.externs.app'),
-    app.act.module.set('args.options'),
-    app.act.module.set('args.full')
-  ]);
-
+/**
+ * @param {string} key
+ * @return {fm.Action}
+ */
+app.act.scheme.get = function(key) {
+  var scheme = fm.get('scheme');
 
   /**
    * @param {function()} complete
    * @param {function(string, number=)} cancel
    */
-  var argsSrc = function(complete, cancel) {
-    var srcDir = scheme['srcDir'];
-    var rootNamespace = scheme['rootNamespace'];
-    var filenames = module['src'];
-
-    if (typeof srcDir === 'string' &&
-        typeof rootNamespace === 'string' &&
-        filenames instanceof Array) {
-
-      var i = 0,
-          l = filenames.length;
-
-      var args = '';
-
-      while (i < l) {
-        args += ' --js ' + path.join(srcDir, rootNamespace, filenames[i]);
-        i += 1;
-      }
-
-      fm.set('module.args.src', args);
+  function get(complete, cancel) {
+    if (scheme[key] instanceof Object) {
       complete();
     } else {
-      cancel('[app.act.module.set] missing section: srcDir|rootNamespace|module.src');
+      cancel('[app.act.scheme.get] missing ' + key + ' section');
     }
-  };
+  }
 
-
-  /**
-   * @param {string} dir
-   * @return {fm.Action}
-   */
-  var argsExterns = function(dir) {
-    return function(complete, cancel) {
-      if (dir !== '') {
-        act.fs.readFilesTree(dir, handleReaded, cancel);
-      } else {
-        cancel('[app.act.module.set] missing ' + dir + 'section');
-      }
-
-      function handleReaded(filenames) {
-        var i = 0,
-            l = filenames.length;
-
-        var args = '';
-
-        while (i < l) {
-          args += ' --externs ' + filenames[i];
-          i += 1;
-        }
-
-        fm.set('module.args.externs', args);
-        complete()
-      }
-    }
-  };
-
-
-  /**
-   * @param {function()} complete
-   * @param {function(string, number=)} cancel
-   */
-  var argsOptions = function(complete, cancel) {
-    var options = scheme['compilerOptions'];
-    var args = '';
-
-    args += ' --js_output_file ' + path.join(scheme['buildDir'], module['name'] || 'app') + '.js';
-    args += ' --compilation_level ' + (options['compilationLevel'] || 'WHITESPACE_ONLY');
-    args += ' --warning_level=' + (options['warningLevel'] || 'VERBOSE');
-    args += ' --language_in=' + (options['language'] || 'ECMASCRIPT5');
-
-    if (options['formatting'] !== '') {
-      args += ' --formatting=' + options['formatting'];
-    }
-
-    fm.set('module.args.options', args);
-    complete();
-  };
-
-
-  var argsFull = function(complete, cancel) {
-    var args = module['args'];
-
-    fm.set('module.args.full',
-        fm.get('module.args.src') +
-        fm.get('module.args.externs') +
-        fm.get('module.args.externs') +
-        fm.get('module.args.options'));
-
-    complete();
-  };
-
-
-  var set = {
-    'args': args,
-    'args.src': argsSrc,
-    'args.externs.node': argsExterns(externsNodeDir),
-    'args.externs.app': argsExterns(externsAppDir),
-    'args.options': argsOptions,
-    'args.full': argsFull
-  };
-
-  return set[key];
-};
-
-
-/**
- * @param {function()} complete
- * @param {function(string, number=)} cancel
- */
-app.act.module.make = function(complete, cancel) {
-  var gccCommand = fm.get('gcc.command');
-  var module = fm.get('module');
-  var args = fm.get('module.args.full');
-
-  act.proc.exec(gccCommand + args)({}, complete, cancel);
+  return get;
 };
 
 
@@ -591,28 +493,6 @@ app.act.scheme.load = function(key) {
         cancel('[app.act.scheme.load] parsing error: ' + error.toString());
       }
     }, cancel);
-  }
-};
-
-
-/**
- * @param {string} key
- * @return {fm.Action}
- */
-app.act.scheme.getModules = function(key) {
-  var scheme = fm.get(key);
-
-  /**
-   * @param {*} _
-   * @param {function(!Array.<app.Module>)} complete
-   * @param {function(string, number=)} cancel
-   */
-  return function(_, complete, cancel) {
-    if (scheme['modules'] instanceof Array) {
-      complete(scheme['modules']);
-    } else {
-      cancel('[act.scheme.getModules] missing modules section');
-    }
   }
 };
 
@@ -647,22 +527,115 @@ app.act.scheme.__depsToArray = function(obj) {
  * @param {string} key
  * @return {fm.Action}
  */
-app.act.scheme.get = function(key) {
-  var scheme = fm.get('scheme');
-
+app.act.gcc.set = function(key) {
   /**
    * @param {function()} complete
    * @param {function(string, number=)} cancel
    */
-  function get(complete, cancel) {
-    if (scheme[key] instanceof Object) {
-      complete();
-    } else {
-      cancel('[app.act.scheme.get] missing ' + key + ' section');
+  function nop(complete, cancel) {
+    complete();
+  }
+
+  /**
+   * @param {function(string)} complete
+   * @param {function(string, number=)} cancel
+   */
+  function setArgs(complete, cancel) {
+    fm.script([
+      fm.assert('scheme', 'srcDir', 'string'),
+      fm.assert('scheme', 'rootNamespace', 'string'),
+      fm.assert('module', 'src', Array),
+      fm.assert('externs.node.dir', 'string'),
+      fm.assert('externs.dir', 'string'),
+      fm.assert('scheme', 'compilerOptions', 'string'),
+      fm.assert('scheme', 'buildDir', 'string'),
+      fm.assert('module', 'name', 'string'),
+
+      generateSrcArgs,
+      generateExternsArgs(externsNodeDir),
+      generateExternsArgs(externsAppDir),
+      generateOptionsArgs,
+    ])(function(args) {
+      fm.set('gcc.args', args);
+      complete(args);
+    }, cancel, '');
+  }
+
+  /**
+   * @param {function(string)} complete
+   * @param {function(string, number=)} cancel
+   * @param {string} args
+   */
+  function generateSrcArgs(complete, cancel, args) {
+    var srcDir = fm.get('scheme', 'srcDir');
+    var rootNamespace = fm.get('scheme', 'rootNamespace');
+    var filesnames = fm.get('module', 'src');
+
+    var i = 0,
+        l = filenames.length;
+
+    while (i < l) {
+      args += ' --js ' + path.join(srcDir, rootNamespace, filenames[i]);
+      i += 1;
+    }
+
+    complete(args);
+  }
+
+
+  /**
+   * @param {string} dir
+   * @return {fm.Action}
+   */
+  function generateExternsArgs(dir) {
+    return function(complete, cancel, args) {
+      act.fs.readFilesTree(dir, handleReaded, cancel);
+
+      function handleReaded(filenames) {
+        var i = 0,
+            l = filenames.length;
+
+        while (i < l) {
+          args += ' --externs ' + filenames[i];
+          i += 1;
+        }
+
+        complete(args);
+      }
     }
   }
 
-  return get;
+
+  /**
+   * @param {function(string)} complete
+   * @param {function(string, number=)} cancel
+   * @param {string} args
+   */
+  function generateOptionsArgs(complete, cancel, args) {
+    args += ' --js_output_file ' + path.join(buildDir, moduleName || 'app') + '.js';
+    args += ' --compilation_level ' + (options['compilationLevel'] || 'WHITESPACE_ONLY');
+    args += ' --warning_level=' + (options['warningLevel'] || 'VERBOSE');
+    args += ' --language_in=' + (options['language'] || 'ECMASCRIPT5');
+
+    if (options['formatting'] !== '') {
+      args += ' --formatting=' + options['formatting'];
+    }
+
+    complete(args);
+  }
+
+  return key === 'args' ? setArgs : nop;
+};
+
+
+/**
+ * @param {function()} complete
+ * @param {function(string, number=)} cancel
+ */
+app.act.gcc.invoke = function(complete, cancel) {
+  var command = fm.get('gcc.command');
+  var args = fm.get('gcc.args');
+  act.proc.exec(command + args)({}, complete, cancel);
 };
 
 
