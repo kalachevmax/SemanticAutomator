@@ -166,6 +166,14 @@ fm.Action;
 app.Module;
 
 
+app.log = function(message) {
+  return function(complete, cancel, input) {
+    console.log(message);
+    complete(input);
+  }
+};
+
+
 /**
  * @type {!Function}
  */
@@ -207,8 +215,10 @@ fm.set = function(key, value) {
  * @return {fm.Input}
  */
 fm.get = function(key, opt_subkey) {
-  if (fm.__dm[key] instanceof Object) {
-    return fm.__dm[key][opt_subkey] || null;
+  if (opt_subkey) {
+    if (fm.__dm[key] instanceof Object) {
+      return fm.__dm[key][opt_subkey] || null;
+    }
   } else {
     return fm.__dm[key] || null;
   }
@@ -222,13 +232,13 @@ fm.get = function(key, opt_subkey) {
  */
 fm.assign = function(key, opt_value) {
   /**
-   * @param {fm.Input} input
    * @param {function(fm.Input)} complete
    * @param {function(string, number=)} cancel
+   * @param {fm.Input=} opt_input
    */
-  return function(input, complete, cancel) {
-    fm.__dm[key] = opt_value || input;
-    complete(input);
+  return function(complete, cancel, opt_input) {
+    fm.__dm[key] = opt_value || opt_input;
+    complete(opt_input);
   }
 };
 
@@ -236,12 +246,12 @@ fm.assign = function(key, opt_value) {
 /**
  * @param {string} key
  * @param {string} subkeyOrType
- * @param {string|!Function} type
+ * @param {*} type
  */
 fm.assert = function(key, subkeyOrType, type) {
   var argsCount = arguments.length;
 
-  return function(complete, cancel) {
+  return function(complete, cancel, opt_input) {
     function check(isPrimitive, key, type, opt_subkey) {
       var obj = fm.__dm;
 
@@ -283,7 +293,7 @@ fm.assert = function(key, subkeyOrType, type) {
 
     if (argsCount === 2) {
       if (check(typeof subkeyOrType === 'string', key, subkeyOrType)) {
-        complete();
+        complete(opt_input);
       } else {
         cancel('[fm.assert] parameter ' + key + ' must be of type ' +
             getTypeMessage(subkeyOrType));
@@ -291,7 +301,7 @@ fm.assert = function(key, subkeyOrType, type) {
     } else {
       if (check(false, key, Object)) {
         if (check(typeof type === 'string', key, type, subkeyOrType)) {
-          complete();
+          complete(opt_input);
         } else {
           cancel('[fm.assert] parameter ' + key + '[' + subkeyOrType + ']' +
               ' must be of type ' + getTypeMessage(type));
@@ -339,16 +349,16 @@ fm.script = function(actions) {
  * @return {fm.Action}
  */
 fm.each = function(action) {
-  return function(list, complete, cancel) {
-    var context = this;
+  return function(complete, cancel, list) {
+    var localList = list.slice(0);
 
     function process(item) {
-      action.call(context, item, fold, cancel);
+      action(fold, cancel, item);
     }
 
     function fold() {
-      if (list.length > 0) {
-        process(list.shift());
+      if (localList.length > 0) {
+        process(localList.shift());
       } else {
         complete();
       }
@@ -366,20 +376,18 @@ fm.each = function(action) {
  * @return {fm.Action}
  */
 fm.if = function(action, trueBranch, opt_falseBranch) {
-  return function(atom, complete, cancel) {
-    var context = this;
-
-    action(atom, function(result) {
+  return function(complete, cancel, atom) {
+    action(function(result) {
       if (result) {
-        trueBranch.call(context, atom, complete, cancel);
+        trueBranch(complete, cancel, atom);
       } else {
         if (typeof opt_falseBranch === 'function') {
-          opt_falseBranch.call(context, atom, complete, cancel);
+          opt_falseBranch(complete, cancel, atom);
         } else {
           complete(atom);
         }
       }
-    }, cancel);
+    }, cancel, atom);
   }
 };
 
@@ -389,7 +397,7 @@ fm.if = function(action, trueBranch, opt_falseBranch) {
  * @return {fm.Action}
  */
 act.fs.readFile = function(opt_options) {
-  return function(filename, complete, cancel) {
+  return function(complete, cancel, filename) {
     fs.readFile(filename, opt_options, function(err, data) {
       if (err === null) {
         complete(data);
@@ -402,11 +410,11 @@ act.fs.readFile = function(opt_options) {
 
 
 /**
- * @param {string} itemPath
  * @param {function(boolean)} complete
  * @param {function(string, number=)} cancel
+ * @param {string} itemPath
  */
-act.fs.isDirectory = function(itemPath, complete, cancel) {
+act.fs.isDirectory = function(complete, cancel, itemPath) {
   fs.stat(itemPath, function(err, stats) {
     if (err) {
       cancel('Error reading directory item:' + err.toString());
@@ -418,11 +426,11 @@ act.fs.isDirectory = function(itemPath, complete, cancel) {
 
 
 /**
- * @param {string} dirPath
  * @param {function(string)} complete
  * @param {function(string, number=)} cancel
+ * @param {string} dirPath
  */
-act.fs.readDir = function(dirPath, complete, cancel) {
+act.fs.readDir = function(complete, cancel, dirPath) {
   fs.readdir(dirPath, function(err, items) {
     if (err) {
       cancel('Error reading directory :' + err.toString());
@@ -434,40 +442,40 @@ act.fs.readDir = function(dirPath, complete, cancel) {
 
 
 /**
- * @param {string} dirPath
  * @param {function(!Array.<string>)} complete
  * @param {function(string, number=)} cancel
+ * @param {string} dirPath
  */
-act.fs.readFilesTree = function(dirPath, complete, cancel) {
+act.fs.readFilesTree = function(complete, cancel, dirPath) {
   var fullPath = [];
   var files = [];
 
   function enterDir(dirPath) {
-    return function (fullDirPath, complete, cancel) {
+    return function (complete, cancel, fullDirPath) {
       fullPath.push(dirPath);
       complete(fullDirPath);
     }
   }
 
-  function leaveDir(_, complete, cancel) {
+  function leaveDir(complete, cancel) {
     fullPath.pop();
     complete();
   }
 
-  function addFile(file, complete, cancel) {
+  function addFile(complete, cancel, file) {
     files.push(file);
     complete();
   }
 
-  function processDir(dirPath, complete, cancel) {
+  function processDir(complete, cancel, dirPath) {
     fm.script([
       act.fs.readDir,
       fm.each(processItem),
       leaveDir
-    ])(dirPath, complete, cancel);
+    ])(complete, cancel, dirPath);
   }
 
-  function processItem(item, complete, cancel) {
+  function processItem(complete, cancel, item) {
     var fullItemPath = path.join(fullPath.join('/'), item);
 
     fm.script([
@@ -475,15 +483,15 @@ act.fs.readFilesTree = function(dirPath, complete, cancel) {
         enterDir(item),
         processDir
       ]), addFile)
-    ])(fullItemPath, complete, cancel);
+    ])(complete, cancel, fullItemPath);
   }
 
   fm.script([
     enterDir(dirPath),
     processDir
-  ])(dirPath, function() {
+  ])(function() {
     complete(files);
-  }, cancel);
+  }, cancel, dirPath);
 };
 
 
@@ -492,7 +500,7 @@ act.fs.readFilesTree = function(dirPath, complete, cancel) {
  * @return {fm.Action}
  */
 act.proc.exec = function(command) {
-  return function(opt_options, complete, cancel) {
+  return function(complete, cancel, opt_options) {
     childProcess.exec(command, opt_options, function (error, stdout, stderr) {
       console.log(stdout);
       console.log(stderr);
@@ -511,16 +519,17 @@ act.proc.exec = function(command) {
  * @param {string} key
  * @return {fm.Action}
  */
+
 app.act.scheme.get = function(key) {
   var scheme = fm.get('scheme');
 
   /**
-   * @param {function()} complete
+   * @param {function(fm.Input)} complete
    * @param {function(string, number=)} cancel
    */
   function get(complete, cancel) {
-    if (scheme[key] instanceof Object) {
-      complete();
+    if (typeof scheme[key] !== 'undefined') {
+      complete(scheme[key]);
     } else {
       cancel('[app.act.scheme.get] missing ' + key + ' section');
     }
@@ -537,39 +546,84 @@ app.act.scheme.get = function(key) {
 app.act.scheme.load = function(complete, cancel) {
   var filename = fm.get('scheme.filename');
 
-  act.fs.readFile({encoding: 'utf-8'})(filename, function (file) {
+  act.fs.readFile({encoding: 'utf-8'})(function(file) {
+    var content = null;
+
     try {
-      complete(JSON.parse(file));
+      content = JSON.parse(file);
     } catch (error) {
+    }
+
+    if (content !== null) {
+      complete(content);
+    } else {
       cancel('[app.act.scheme.load] parsing error: ' + error.toString());
     }
-  }, cancel);
+
+  }, cancel, filename);
 };
 
 
 /**
- * @param {!Object.<string, !Object>} obj
- * @return {!Array.<!Object>}
+ * @param {function(app.Scheme)} complete
+ * @param {function(string, number=)} cancel
+ * @param {app.Scheme} scheme
  */
-app.act.scheme.__depsToArray = function(obj) {
+app.act.scheme.transformModules = function(complete, cancel, scheme) {
   var result = [];
+  var modules = scheme['modules'];
 
-  for (var name in obj) {
+  for (var name in modules) {
+    result.push({
+      name: name,
+      src: modules[name]['src']
+    });
+  }
+
+  scheme['modules'] = result;
+  complete(scheme);
+};
+
+
+/**
+ * @param {function(app.Scheme)} complete
+ * @param {function(string, number=)} cancel
+ * @param {app.Scheme} scheme
+ */
+app.act.scheme.transformDeps = function(complete, cancel, scheme) {
+  var result = [];
+  var deps = scheme['deps'];
+
+  for (var name in deps) {
     var item = {
       name: name
     };
 
-    if (obj[name] instanceof Object) {
-      item = utils.obj.extend(item, obj[name]);
-    } else if (typeof obj[name] === 'string') {
+    if (deps[name] instanceof Object) {
+      item = utils.obj.extend(item, deps[name]);
+    } else if (typeof deps[name] === 'string') {
       item.type = 'git';
-      item.repo = obj[name];
+      item.repo = deps[name];
     }
 
     result.push(item);
   }
 
-  return result;
+  scheme['deps'] = result;
+  complete(scheme);
+};
+
+
+/**
+ * @param {function(app.Scheme)} complete
+ * @param {function(string, number=)} cancel
+ * @param {app.Scheme} scheme
+ */
+app.act.scheme.transform = function(complete, cancel, scheme) {
+  fm.script([
+    app.act.scheme.transformModules,
+    app.act.scheme.transformDeps
+  ])(complete, cancel, scheme);
 };
 
 
@@ -596,14 +650,14 @@ app.act.gcc.set = function(key) {
       fm.assert('scheme', 'rootNamespace', 'string'),
       fm.assert('module', 'src', Array),
       fm.assert('externs.node.dir', 'string'),
-      fm.assert('externs.dir', 'string'),
-      fm.assert('scheme', 'compilerOptions', 'string'),
+      fm.assert('scheme', 'externs', 'string'),
+      fm.assert('scheme', 'compilerOptions', Object),
       fm.assert('scheme', 'buildDir', 'string'),
       fm.assert('module', 'name', 'string'),
 
       generateSrcArgs,
-      generateExternsArgs(externsNodeDir),
-      generateExternsArgs(externsAppDir),
+      generateExternsArgs(fm.get('externs.node.dir')),
+      generateExternsArgs(fm.get('scheme', 'externs')),
       generateOptionsArgs,
     ])(function(args) {
       fm.set('gcc.args', args);
@@ -639,7 +693,7 @@ app.act.gcc.set = function(key) {
    */
   function generateExternsArgs(dir) {
     return function(complete, cancel, args) {
-      act.fs.readFilesTree(dir, handleReaded, cancel);
+      act.fs.readFilesTree(handleReaded, cancel, dir);
 
       function handleReaded(filenames) {
         var i = 0,
@@ -689,7 +743,8 @@ app.act.gcc.set = function(key) {
 app.act.gcc.invoke = function(complete, cancel) {
   var command = fm.get('gcc.command');
   var args = fm.get('gcc.args');
-  act.proc.exec(command + args)({}, complete, cancel);
+  console.log('app.act.gcc.invoke: ', command + args);
+  act.proc.exec(command + args)(complete, cancel, {});
 };
 
 
@@ -727,11 +782,10 @@ app.usage = function() {
 
 
 /**
- * @param {app.Scheme} scheme
  * @param {function(string)} complete
  * @param {function(string, number=)} cancel
  */
-app.act.cli.read = function(scheme, complete, cancel) {
+app.act.cli.read = function(complete, cancel) {
   if (process.argv.length === 2 || typeof act[process.argv[2]] === 'function') {
     complete(process.argv[2] || 'make');
   } else {
@@ -742,11 +796,12 @@ app.act.cli.read = function(scheme, complete, cancel) {
 
 
 /**
- * @param {string} name
  * @param {function()} complete
  * @param {function(string, number=)} cancel
  */
-app.act.cmd.invoke = function(name, complete, cancel) {
+app.act.cmd.invoke = function(complete, cancel) {
+  var name = fm.get('action.name');
+
   cmd[name](function() {
     console.log(cmd.MESSAGES[name]);
     complete();
@@ -759,37 +814,41 @@ cmd.MESSAGES = {
 };
 
 
-cmd.make = fm.script([
-  app.act.scheme.get('modules'),
+cmd.make = function(complete, cancel) {
+  fm.script([
+    app.act.scheme.get('modules'),
 
-  fm.each(fm.script([
-    fm.assign('module'),
-    app.act.gcc.set('args'),
-    app.act.gcc.invoke
-  ]))
-]);
-
-
-cmd.update = fm.script([
-  app.act.scheme.get('deps'),
-  fm.each(fm.script([
-    fm.assign('dep'),
-    app.act.dep.update
-  ]))
-]);
+    fm.each(fm.script([
+      fm.assign('module'),
+      app.act.gcc.set('args'),
+      app.act.gcc.invoke
+    ]))
+  ])(complete, cancel);
+};
 
 
-cmd.act.publish = fm.script([
+cmd.update = function(complete, cancel) {
+  fm.script([
+    app.log('cmd.update'),
+    app.act.scheme.get('deps'),
+    fm.each(fm.script([
+      fm.assign('dep'),
+      app.act.dep.update
+    ]))
+  ])(complete, cancel);
+};
+
+
+cmd.publish = fm.script([
 
 ]);
 
 
 /**
- * @type {fm.Action}
  */
 app.setup = fm.script([
   fm.assign('scheme.filename', SCHEME_FILE_NAME),
-  fm.assign('node.externs.dir', NODE_EXTERNS_DIR),
+  fm.assign('externs.node.dir', NODE_EXTERNS_DIR),
   fm.assign('gcc.command', GCC_COMMAND),
   fm.assign('deps.dir', DEPS_DIR)
 ]);
@@ -801,8 +860,13 @@ app.setup = fm.script([
 app.main = fm.script([
   app.setup,
 
-  fm.assert('scheme.filename'),
   app.act.scheme.load,
+  fm.assign('scheme'),
+
+  fm.assert('scheme', 'modules', Object),
+  fm.assert('scheme', 'deps', Object),
+
+  app.act.scheme.transform,
   fm.assign('scheme'),
 
   app.act.cli.read,
