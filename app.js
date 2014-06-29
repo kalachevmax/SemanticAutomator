@@ -743,20 +743,22 @@ app.act.gcc.set = function(key) {
 app.act.gcc.invoke = function(complete, cancel) {
   var command = fm.get('gcc.command');
   var args = fm.get('gcc.args');
-  console.log('app.act.gcc.invoke: ', command + args);
+  console.log(command + args);
   act.proc.exec(command + args)(complete, cancel, {});
 };
 
 
 /**
- * @param {function(!Object)} complete
+ * @param {function()} complete
  * @param {function(string, number=)} cancel
  */
 app.act.dep.update = function(complete, cancel) {
   var dep = fm.get('dep');
 
-  if (dep['name'] === 'git') {
-    app.act.git.clone(complete, cancel, dep['repo'])
+  if (dep['type'] === 'git') {
+    app.act.git.clone(complete, cancel)
+  } else {
+    complete();
   }
 };
 
@@ -764,11 +766,13 @@ app.act.dep.update = function(complete, cancel) {
 /**
  * @param {function()} complete
  * @param {function(string, number=)} cancel
- * @param {string} repo
  */
-app.act.git.clone = function(complete, cancel, repo) {
+app.act.git.clone = function(complete, cancel) {
   var depsDir = fm.get('deps.dir');
-  act.proc.exec('git clone ' + repo + depsDir)({}, complete, cancel);
+  var repo = fm.get('dep', 'repo');
+  var name = fm.get('dep', 'name');
+
+  act.proc.exec('git clone ' + repo + ' ' + depsDir + '/' + name)(complete, cancel, {});
 };
 
 
@@ -786,7 +790,7 @@ app.usage = function() {
  * @param {function(string, number=)} cancel
  */
 app.act.cli.read = function(complete, cancel) {
-  if (process.argv.length === 2 || typeof act[process.argv[2]] === 'function') {
+  if (process.argv.length === 2 || typeof cmd[process.argv[2]] === 'function') {
     complete(process.argv[2] || 'make');
   } else {
     app.usage();
@@ -829,8 +833,8 @@ cmd.make = function(complete, cancel) {
 
 cmd.update = function(complete, cancel) {
   fm.script([
-    app.log('cmd.update'),
     app.act.scheme.get('deps'),
+
     fm.each(fm.script([
       fm.assign('dep'),
       app.act.dep.update
