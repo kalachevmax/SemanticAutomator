@@ -239,9 +239,66 @@ fm.assign = function(key, opt_value) {
  * @param {string|!Function} type
  */
 fm.assert = function(key, subkeyOrType, type) {
+  var argsCount = arguments.length;
+
   return function(complete, cancel) {
-    if (arguments.length === 2) {
-      if (typeof subkeyOrType === 'string') {
+    function check(isPrimitive, key, type, opt_subkey) {
+      var obj = fm.__dm;
+
+      if (opt_subkey) {
+        obj = fm.__dm[key];
+        key = opt_subkey;
+      }
+
+      if (isPrimitive) {
+        return typeof obj[key] === type;
+      } else {
+        return obj[key] instanceof type;
+      }
+    }
+
+    function getTypeMessage(type) {
+      if (typeof type === 'string') {
+        return type;
+      }
+
+      if (type instanceof Array) {
+        return 'Array';
+      }
+
+      if (type instanceof Object) {
+        return 'Object';
+      }
+
+      if (type instanceof RegExp) {
+        return 'RegExp';
+      }
+
+      if (type instanceof Date) {
+        return 'Date';
+      }
+
+      return type;
+    }
+
+    if (argsCount === 2) {
+      if (check(typeof subkeyOrType === 'string', key, subkeyOrType)) {
+        complete();
+      } else {
+        cancel('[fm.assert] parameter ' + key + ' must be of type ' +
+            getTypeMessage(subkeyOrType));
+      }
+    } else {
+      if (check(false, key, Object)) {
+        if (check(typeof type === 'string', key, type, subkeyOrType)) {
+          complete();
+        } else {
+          cancel('[fm.assert] parameter ' + key + '[' + subkeyOrType + ']' +
+              ' must be of type ' + getTypeMessage(type));
+        }
+      } else {
+        cancel('[fm.assert] parameter ' + key + ' must be of type ' +
+            getTypeMessage(Object));
       }
     }
   }
