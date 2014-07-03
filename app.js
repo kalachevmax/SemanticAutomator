@@ -97,6 +97,18 @@ act.fs = {};
 /**
  * @namespace
  */
+act.fs.item = {};
+
+
+/**
+ * @namespace
+ */
+act.fs.dir = {};
+
+
+/**
+ * @namespace
+ */
 act.proc = {};
 
 
@@ -379,10 +391,14 @@ fm.if = function(action, trueBranch, opt_falseBranch) {
   return function(complete, cancel, atom) {
     action(function(result) {
       if (result) {
-        trueBranch(complete, cancel, atom);
+        trueBranch(function() {
+          complete(atom)
+        }, cancel, atom);
       } else {
         if (typeof opt_falseBranch === 'function') {
-          opt_falseBranch(complete, cancel, atom);
+          opt_falseBranch(function() {
+            complete(atom);
+          }, cancel, atom);
         } else {
           complete(atom);
         }
@@ -496,6 +512,72 @@ act.fs.readFilesTree = function(complete, cancel, dirPath) {
 
 
 /**
+ * @param {function(!Array.<string>)} complete
+ * @param {function(string, number=)} cancel
+ * @param {string} path
+ */
+act.fs.getSubDirs = function(complete, cancel, path) {
+  var result = [];
+
+  var add = function(complete, cancel, dir) {
+    result.push(dir);
+    complete();
+  };
+
+  fm.script([
+    act.fs.dir.read,
+    fm.each(fm.if(act.fs.isDirectory, add))
+  ])(function() {
+    complete(result);
+  }, cancel, path);
+};
+
+
+/**
+ * @param {function(boolean)} complete
+ * @param {function(string, number=)} cancel
+ * @param {string} path
+ */
+act.fs.item.exists = function(complete, cancel, path) {
+  fs.exists(path, function(result) {
+    complete(result);
+  });
+};
+
+
+/**
+ * @param {function()} complete
+ * @param {function(string, number=)} cancel
+ * @param {string} path
+ */
+act.fs.dir.create = function(complete, cancel, path) {
+  fs.mkdir(path, function(error) {
+    if (error === null) {
+      complete();
+    } else {
+      cancel('[act.fs.dir.create] ' + error.toString());
+    }
+  });
+};
+
+
+/**
+ * @param {function()} complete
+ * @param {function(string, number=)} cancel
+ * @param {string} path
+ */
+act.fs.dir.remove = function(complete, cancel, path) {
+  fs.rmdir(path, function(error) {
+    if (error === null) {
+      complete();
+    } else {
+      cancel('[act.fs.dir.remove] ' + error.toString());
+    }
+  });
+};
+
+
+/**
  * @param {string} command
  * @return {fm.Action}
  */
@@ -548,10 +630,12 @@ app.act.scheme.load = function(complete, cancel) {
 
   act.fs.readFile({encoding: 'utf-8'})(function(file) {
     var content = null;
+    var error = null;
 
     try {
       content = JSON.parse(file);
-    } catch (error) {
+    } catch (err) {
+      error = err;
     }
 
     if (content !== null) {
@@ -650,14 +734,14 @@ app.act.gcc.set = function(key) {
       fm.assert('scheme', 'rootNamespace', 'string'),
       fm.assert('module', 'src', Array),
       fm.assert('externs.node.dir', 'string'),
-      fm.assert('scheme', 'externs', 'string'),
+      fm.assert('scheme', 'externsDir', 'string'),
       fm.assert('scheme', 'compilerOptions', Object),
       fm.assert('scheme', 'buildDir', 'string'),
       fm.assert('module', 'name', 'string'),
 
       generateSrcArgs,
       generateExternsArgs(fm.get('externs.node.dir')),
-      generateExternsArgs(fm.get('scheme', 'externs')),
+      generateDepsExternsArgs(fm.get('scheme', 'externsDir')),
       generateOptionsArgs,
     ])(function(args) {
       fm.set('gcc.args', args);
@@ -701,6 +785,29 @@ app.act.gcc.set = function(key) {
 
         while (i < l) {
           args += ' --externs ' + filenames[i];
+          i += 1;
+        }
+
+        complete(args);
+      }
+    }
+  }
+
+
+  /**
+   * @param {string} externsDir
+   * @return {fm.Action}
+   */
+  function generateDepsExternsArgs(externsDir) {
+    return function(complete, cancel, args) {
+      act.fs.getSubDirs(handleReaded, cancel, fm.get('deps.dir'));
+
+      function handleReaded(deps) {
+        var i = 0,
+            l = deps.length;
+
+        while (i < l) {
+          args += ' --externs ' + path.join(deps[i], externsDir, 'externs.js');
           i += 1;
         }
 
@@ -833,13 +940,16 @@ cmd.make = function(complete, cancel) {
 
 cmd.update = function(complete, cancel) {
   fm.script([
+    fm.if(act.fs.item.exists, act.fs.dir.remove),
+    act.fs.dir.create,
+
     app.act.scheme.get('deps'),
 
     fm.each(fm.script([
       fm.assign('dep'),
       app.act.dep.update
     ]))
-  ])(complete, cancel);
+  ])(complete, cancel, fm.get('deps.dir'));
 };
 
 
