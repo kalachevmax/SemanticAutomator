@@ -178,14 +178,6 @@ fm.Action;
 app.Module;
 
 
-app.log = function(message) {
-  return function(complete, cancel, input) {
-    console.log(message);
-    complete(input);
-  }
-};
-
-
 /**
  * @type {!Function}
  */
@@ -232,8 +224,41 @@ fm.get = function(key, opt_subkey) {
       return fm.__dm[key][opt_subkey] || null;
     }
   } else {
-    return fm.__dm[key] || null;
+    return fm.__dm[key] || fm.__symbols[key]() || null;
   }
+};
+
+
+/**
+ * @param {string} symbol
+ * @param {!Function} fn
+ */
+fm.define = function(symbol, fn) {
+  fm.__symbols[symbol] = fn;
+};
+
+
+/**
+ * @param {string} key
+ * @return {fm.Action}
+ */
+fm.obtain = function(key) {
+  /**
+   * @param {function(fm.Input)} complete
+   * @param {function(string, number=)} cancel
+   * @param {fm.Input} input
+   */
+  function obtain(complete, cancel, input) {
+    var fn = fm.get(key);
+
+    if (typeof fn === 'function') {
+      complete(fm.get(key)(input));
+    } else {
+      cancel('[fm.obtain] symbol ' + key + ' is not defined');
+    }
+  }
+
+  return obtain;
 };
 
 
@@ -405,6 +430,50 @@ fm.if = function(action, trueBranch, opt_falseBranch) {
       }
     }, cancel, atom);
   }
+};
+
+
+/**
+ * @param {string} key
+ * @return {fm.Action}
+ */
+fm.obtain = function(key) {
+  /**
+   * @param {function(fm.Input)} complete
+   * @param {function(string, number=)} cancel
+   * @param {fm.Input} input
+   */
+  function obtain(complete, cancel, input) {
+    var fn = fm.get(key);
+
+    if (typeof fn === 'function') {
+      complete(fm.get(key)(input));
+    } else {
+      cancel('[fm.obtain] symbol ' + key + ' is not defined');
+    }
+  }
+
+  return obtain;
+};
+
+
+
+/**
+ * @param {string} message
+ * @return {fm.Action}
+ */
+fm.log = function(message) {
+  /**
+   * @param {function(fm.Input)} complete
+   * @param {function(string, number=)} cancel
+   * @param {fm.Input} input
+   */
+  function log(complete, cancel, input) {
+    console.log('[fm.log] ', message, input);
+    complete(input);
+  }
+
+  return log;
 };
 
 
@@ -777,6 +846,7 @@ app.act.gcc.set = function(key) {
    */
   function generateExternsArgs(dir) {
     return function(complete, cancel, args) {
+      console.log('dir:', dir);
       act.fs.readFilesTree(handleReaded, cancel, dir);
 
       function handleReaded(filenames) {
@@ -998,6 +1068,7 @@ app.main = fm.script([
 
   fm.assert('scheme', 'modules', Object),
   fm.assert('scheme', 'deps', Object),
+  pm.type('externs.node.dir', pm.Type.DIRECTORY),
 
   app.act.scheme.transform,
   fm.assign('scheme'),
