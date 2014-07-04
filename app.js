@@ -800,18 +800,37 @@ app.act.gcc.set = function(key) {
    */
   function generateDepsExternsArgs(externsDir) {
     return function(complete, cancel, args) {
-      act.fs.getSubDirs(handleReaded, cancel, fm.get('deps.dir'));
+      fm.define('dep.externs.dir', function(depPath) {
+        return path.join(depPath, externsDir);
+      });
 
-      function handleReaded(deps) {
+      fm.script([
+        fm.obtain('deps.dir'),
+        act.fs.getSubDirs,
+
+        fm.each(fm.script([
+          fm.obtain('dep.externs.dir'),
+          act.fs.readFilesTree
+        ]))
+      ])(function(filenames) {
+        complete(generateArgsBy(filenames));
+      }, cancel);
+
+
+      /**
+       * @param {!Array.<string>} filenames
+       * @return {string}
+       */
+      function generateArgsBy(filenames) {
         var i = 0,
-            l = deps.length;
+            l = filenames.length;
 
         while (i < l) {
-          args += ' --externs ' + path.join(deps[i], externsDir, 'externs.js');
+          args += ' --externs ' + filenames[i];
           i += 1;
         }
 
-        complete(args);
+        return args;
       }
     }
   }
