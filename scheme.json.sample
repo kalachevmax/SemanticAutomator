@@ -13,6 +13,8 @@
   "srcDir": "lib",
   "rootNamespace": "app",
 
+  "externsDir": "externs",
+
   "modules": {
     "app1": {
       "src": [
@@ -26,8 +28,6 @@
       ]
     }
   },
-
-  "externsDir": "externs",
 
   "deps": {
     "justFM": {
