@@ -415,6 +415,19 @@ fm.if = function(action, trueBranch, opt_falseBranch) {
 };
 
 
+fm.not = function(condition) {
+  return function(complete, cancel, input) {
+    condition(function(result) {
+      if (result) {
+        complete(false);
+      } else {
+        complete(true);
+      }
+    }, cancel, input);
+  }
+};
+
+
 /**
  * @param {!Object=} opt_options
  * @return {fm.Action}
@@ -920,7 +933,8 @@ app.act.cmd.invoke = function(complete, cancel) {
 
 
 cmd.MESSAGES = {
-  make: 'The application has been successfully built'
+  make: 'The application has been successfully built.',
+  update: 'All dependencies successfully updated.'
 };
 
 
@@ -941,8 +955,7 @@ cmd.make = function(complete, cancel) {
 
 cmd.update = function(complete, cancel) {
   fm.script([
-    fm.if(act.fs.item.exists, act.fs.dir.remove),
-    act.fs.dir.create,
+    fm.if(fm.not(act.fs.item.exists), act.fs.dir.create),
 
     app.act.scheme.get('deps'),
 
