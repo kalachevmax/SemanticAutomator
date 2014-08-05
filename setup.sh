@@ -1,10 +1,12 @@
 #!/bin/sh
 
-sudo mkdir -p /opt/NodeAppDirector
+SETUP_DIR=/opt/semantic.automator
 
-sudo cp app.js /opt/NodeAppDirector
-sudo cp app /opt/NodeAppDirector
-sudo cp -r externs /opt/NodeAppDirector
-sudo cp tools/closure-compiler.jar /opt/closure-compiler.jar
+sudo mkdir -p ${SETUP_DIR}
 
-sudo ln -fs /opt/NodeAppDirector/app /usr/local/bin/app
+sudo cp auto.js ${SETUP_DIR}
+sudo cp auto ${SETUP_DIR}
+sudo cp -r externs ${SETUP_DIR}
+sudo cp tools/closure-compiler.jar ${SETUP_DIR}
+
+sudo ln -fs ${SETUP_DIR}/auto /usr/local/bin/auto

@@ -128,7 +128,7 @@ var SCHEME_FILE_NAME = 'scheme.json';
 /**
  * @type {string}
  */
-var DIRECTOR_NAME = 'NodeAppDirector';
+var DIRECTOR_NAME = 'semantic.automator';
 
 
 /**
@@ -146,7 +146,7 @@ var NODE_EXTERNS_DIR = DIRECTOR_DIR + '/externs';
 /**
  * @type {string}
  */
-var COMPILER_PATH = '/opt/closure-compiler.jar';
+var COMPILER_PATH = DIRECTOR_DIR + '/closure-compiler.jar';
 
 
 /**
