@@ -1,5 +1,5 @@
 {
-  "name": "ProjectName",
+  "name": "semantic.automator",
 
   "buildDir": "./",
 
@@ -16,24 +16,16 @@
   "externsDir": "externs",
 
   "modules": {
-    "app1": {
+    "semantic.automator": {
       "src": [
         "app1.js"
-      ]
-    },
-
-    "app2": {
-      "src": [
-        "app2.js"
       ]
     }
   },
 
   "deps": {
-    "dep1": {
-      "repo": "repo/path",
-      "type": "git",
-      "version": "*"
-    }
+    "semantic.fm": "https://github.com/kalachevmax/semantic.fm",
+    "semantic.dm": "https://github.com/kalachevmax/semantic.dm",
+    "semantic.node.actions": "https://github.com/kalachevmax/semantic.node.actions"
   }
 }
