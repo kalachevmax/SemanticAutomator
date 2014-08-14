@@ -353,7 +353,7 @@ buffer.Buffer.INSPECT_MAX_BYTES = 50;
 buffer.SlowBuffer = function(size) {};
 
 /**
- * 
+ *
  * @param {string} string
  * @param {number|string} offset
  * @param {number|string=} length

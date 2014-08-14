@@ -99,6 +99,14 @@ module.children;
 var global = {};
 
 /**
- * @type {buffer.Buffer}
+ * @constructor
+ * @param {number|string} size
+ * @param {string=} opt_encoding
  */
-var Buffer;
+var Buffer = function(size, opt_encoding) {};
+
+
+/**
+ * @return {number}
+ */
+Buffer.prototype.length = function() {};
