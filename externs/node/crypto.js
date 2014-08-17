@@ -64,7 +64,7 @@ crypto.createHash = function(algorithm) {};
 crypto.Hash = function(algorithm, options) {};
 
 /**
- * @param {string|buffer.Buffer} data
+ * @param {string|!Buffer} data
  * @param {string=} input_encoding
  */
 crypto.Hash.prototype.update = function(data, input_encoding) {};

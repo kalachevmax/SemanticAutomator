@@ -1,5 +1,8 @@
 
 
+/**
+ * @namespace
+ */
 var utils = {};
 
 

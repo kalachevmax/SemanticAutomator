@@ -1,5 +1,8 @@
 
 
+/**
+ * @namespace
+ */
 var fm = {};
 
 
@@ -28,7 +31,7 @@ fm.List;
 
 
 /**
- * @typedef {function(!Function, !Function, fm.Input=)}
+ * @typedef {function(!Function, !Function, fm.Input)}
  */
 fm.Action;
 
@@ -49,6 +52,14 @@ fm.Script;
  *
  */
 fm.nop = function() {};
+
+
+/**
+ * @param {!Function} complete
+ * @param {!Function} cancel
+ * @param {fm.Input} input
+ */
+fm.noact = function(complete, cancel, input) {};
 
 
 /**
@@ -132,6 +143,14 @@ fm.createAccumulator = function(base) {};
  * @return {fm.Action}
  */
 fm.async = function(syncFn) {};
+
+
+/**
+ * @param {fm.ConditionAction} condition
+ * @return {fm.ConditionAction|function(function(boolean),
+ * function(string, number=), fm.Input)}
+ */
+fm.not = function(condition) {};
 
 
 /**

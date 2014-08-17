@@ -31,6 +31,11 @@
 var fs = {};
 
 /**
+ * @typedef {!Buffer|string}
+ */
+fs.FileContent;
+
+/**
  * @param {string} oldPath
  * @param {string} newPath
  * @param {function(...)=} callback
@@ -259,7 +264,7 @@ fs.rmdirSync = function(path) {};
 
 /**
  * @param {string} path
- * @param {number=} mode
+ * @param {number|function(...)} mode
  * @param {function(...)=} callback
  */
 fs.mkdir = function(path, mode, callback) {};
@@ -272,7 +277,7 @@ fs.mkdirSync = function(path, mode) {};
 
 /**
  * @param {string} path
- * @param {function(string,Array.<string>)=} callback
+ * @param {function(string,!Array.<string>)} callback
  */
 fs.readdir = function(path, callback) {};
 
@@ -397,8 +402,8 @@ fs.readSync = function(fd, buffer, offset, length, position) {};
 
 /**
  * @param {string} filename
- * @param {string|function(string, *)=}encoding
- * @param {function(string, *)=} callback
+ * @param {string|function(string, fs.FileContent)} encoding
+ * @param {function(string, fs.FileContent)=} callback
  */
 fs.readFile = function(filename, encoding, callback) {};
 
@@ -601,11 +606,11 @@ fs.ReadStream = function() {};
 
 /**
  * @param {string} path
- * @param {{flags: string, encoding: ?string, mode: number}=} options
+ * @param {!Object=} opt_options
  * @return {fs.WriteStream}
  * @nosideeffects
  */
-fs.createWriteStream = function(path, options) {};
+fs.createWriteStream = function(path, opt_options) {};
 
 /**
  * @constructor
