@@ -218,19 +218,7 @@ act.fs.stream.__stream = null;
  * @param {!Object=} opt_options
  * @return {fm.Action}
  */
-act.fs.stream.create = function(filename, opt_options) {
-  /**
-   * @param {function()} complete
-   * @param {function(string, number=)} cancel
-   * @param {fm.Input=} opt_input
-   */
-  function create(complete, cancel, opt_input) {
-    act.fs.stream.__stream = fs.createWriteStream(filename, opt_options);
-    complete();
-  }
-
-  return create;
-};
+act.fs.stream.create = function(filename, opt_options) {};
 
 
 /**
@@ -238,38 +226,7 @@ act.fs.stream.create = function(filename, opt_options) {
  * @param {fm.Action} action
  * @return {fm.Action|function(function(), function(string, number=), string)}
  */
-act.fs.stream.read = function(size, action) {
-  /**
-   * @param {function()} complete
-   * @param {function(string, number=)} cancel
-   * @param {string} filename
-   */
-  function read(complete, cancel, filename) {
-    var stream = fs.createReadStream(filename);
-
-    stream.on('readable', handleReadable);
-    stream.on('end', handleEnd);
-    stream.on('error', handleError);
-
-    function handleReadable() {
-      var chunk;
-
-      while ((chunk = stream.read(size)) !== null) {
-        action(fm.nop, console.log, chunk);
-      }
-    }
-
-    function handleEnd() {
-      complete();
-    }
-
-    function handleError(error) {
-      cancel('[act.fs.stream.read] ' + error.toString);
-    }
-  }
-
-  return read;
-};
+act.fs.stream.read = function(size, action) {};
 
 
 /**

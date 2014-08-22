@@ -115,7 +115,7 @@ dm.AtomValue;
 
 
 /**
- * @typedef {dm.AtomValue|!Function|fm.Action|dm.Link}
+ * @typedef {dm.AtomValue|!Function|fm.Action|dm.symbol.Link}
  */
 dm.Value;
 
@@ -204,13 +204,13 @@ dm.getDefaultValue = function(type) {};
 /**
  * @type {dm.AtomActor}
  */
-dm.atom = dm.get.atom;
+dm.atom;
 
 
 /**
  * @type {dm.StringActor}
  */
-dm.num = dm.get.num;
+dm.num;
 
 
 /**
@@ -222,73 +222,73 @@ dm.number = dm.num;
 /**
  * @type {dm.StringActor}
  */
-dm.str = dm.get.str;
+dm.str;
 
 
 /**
  * @type {dm.StringActor}
  */
-dm.string = dm.str;
+dm.string;
 
 
 /**
  * @type {dm.StringActor}
  */
-dm.bool = dm.get.bool;
+dm.bool;
 
 
 /**
  * @type {dm.StringActor}
  */
-dm.boolean = dm.bool;
+dm.boolean;
 
 
 /**
  * @type {dm.StringActor}
  */
-dm.arr = dm.get.array;
+dm.ar;
 
 
 /**
  * @type {dm.StringActor}
  */
-dm.array = dm.arr;
+dm.array;
 
 
 /**
  * @type {dm.StringActor}
  */
-dm.obj = dm.get.object;
+dm.obj;
 
 
 /**
  * @type {dm.StringActor}
  */
-dm.object = dm.obj;
+dm.object;
 
 
 /**
  * @type {dm.StringActor}
  */
-dm.date = dm.get.date;
+dm.date;
 
 
 /**
  * @type {dm.StringActor}
  */
-dm.regexp = dm.get.regexp;
+dm.regexp;
 
 
 /**
  * @type {dm.StringActor}
  */
-dm.link = dm.get.link;
+dm.link;
 
 
 /**
  * @type {dm.StringActor}
  */
-dm.entity = dm.get.entity;
+dm.entity;
 
 
 /**
@@ -715,109 +715,6 @@ dm.do.action = function(namespace) {};
 
 /**
  * @param {string} name
- * @param {dm.Type} type
- * @return {fm.Action|function(function(dm.AtomValue), function(string, number=),
- * fm.Input)}
- */
-dm.get.atom = function(name, type) {};
-
-
-/**
- * @param {string} name
- * @return {fm.Action}
- */
-dm.get.num = function(name) {};
-
-
-/**
- * @type {dm.StringActor}
- */
-dm.get.number = dm.get.num;
-
-
-/**
- * @param {string} name
- * @return {fm.Action}
- */
-dm.get.str = function(name) {};
-
-
-/**
- * @type {dm.StringActor}
- */
-dm.get.string = dm.get.str;
-
-
-/**
- * @param {string} name
- * @return {fm.Action}
- */
-dm.get.bool = function(name) {};
-
-
-/**
- * @type {dm.StringActor}
- */
-dm.get.boolean = dm.get.bool;
-
-
-/**
- * @param {string} name
- * @return {fm.Action}
- */
-dm.get.arr = function(name) {};
-
-
-/**
- * @type {dm.StringActor}
- */
-dm.get.array = dm.get.arr;
-
-
-/**
- * @param {string} name
- * @return {fm.Action}
- */
-dm.get.obj = function(name) {};
-
-
-/**
- * @type {dm.StringActor}
- */
-dm.get.object = dm.get.obj;
-
-
-/**
- * @param {string} name
- * @return {fm.Action}
- */
-dm.get.date = function(name) {};
-
-
-/**
- * @param {string} name
- * @return {fm.Action}
- */
-dm.get.regexp = function(name) {};
-
-
-/**
- * @param {string} name
- * @return {fm.Action}
- */
-dm.get.entity = function(name) {};
-
-
-/**
- * @param {string} name
- * @return {fm.Action|function(function(!dm.Symbol), function(string, number=),
- * fm.Input)}
- */
-dm.get.link = function(name) {};
-
-
-/**
- * @param {string} name
  * @return {fm.Action|function(function(!dm.Symbol), function(string, number=),
  * fm.Input)}
  */
@@ -1066,6 +963,14 @@ dm.set.provider = function(name) {};
 
 
 /**
+ * @param {fm.Action} action1
+ * @param {fm.Action} action2
+ * @return {fm.Action}
+ */
+dm.set.action = function(action1, action2) {};
+
+
+/**
  * @constructor
  * @extends {dm.symbol.Atom}
  */
@@ -1164,6 +1069,30 @@ dm.symbol.RegExp = function(name, opt_value) {};
  * @extends {dm.symbol.Atom}
  */
 dm.symbol.String = function(name, opt_value) {};
+
+
+/**
+ * @constructor
+ * @implements {dm.ILink}
+ * @extends {dm.Symbol}
+ */
+dm.symbol.Link = function() {};
+
+
+/**
+ * @param {function(fm.Input)} complete
+ * @param {function(string, number=)} cancel
+ * @param {fm.Input} input
+ */
+dm.symbol.Link.prototype.isValid = function(complete, cancel, input) {};
+
+
+/**
+ * @param {function(dm.Value)} complete
+ * @param {function(string, number=)} cancel
+ * @param {fm.Input} input
+ */
+dm.symbol.Link.prototype.retrieve = function(complete, cancel, input) {};
 
 
 /**
@@ -1485,29 +1414,6 @@ dm.ITypeProvider.prototype.assert = function(name, type, value) {};
  * @return {dm.ILink}
  */
 dm.ITypeProvider.prototype.createLink = function(name, type, address) {};
-
-
-/**
- * @constructor
- * @implements {dm.ILink}
- */
-dm.Link = function() {};
-
-
-/**
- * @param {function(fm.Input)} complete
- * @param {function(string, number=)} cancel
- * @param {fm.Input} input
- */
-dm.Link.prototype.isValid = function(complete, cancel, input) {};
-
-
-/**
- * @param {function(dm.Value)} complete
- * @param {function(string, number=)} cancel
- * @param {fm.Input} input
- */
-dm.Link.prototype.retrieve = function(complete, cancel, input) {};
 
 
 /**

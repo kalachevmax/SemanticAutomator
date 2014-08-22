@@ -55,8 +55,8 @@ fm.nop = function() {};
 
 
 /**
- * @param {!Function} complete
- * @param {!Function} cancel
+ * @param {function(fm.Input)} complete
+ * @param {function(string, number=)} cancel
  * @param {fm.Input} input
  */
 fm.noact = function(complete, cancel, input) {};
