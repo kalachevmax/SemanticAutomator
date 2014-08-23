@@ -56,6 +56,12 @@ app.act.module = {};
 /**
  * @namespace
  */
+app.act.modules = {};
+
+
+/**
+ * @namespace
+ */
 app.act.cmd = {};
 
 
@@ -673,7 +679,8 @@ app.act.scheme.transformModules = function(complete, cancel, scheme) {
   for (var name in modules) {
     result.push({
       name: name,
-      src: modules[name]['src']
+      src: modules[name]['src'],
+      disabled: modules[name]['disabled'] || false
     });
   }
 
@@ -721,6 +728,29 @@ app.act.scheme.transform = function(complete, cancel, scheme) {
     app.act.scheme.transformModules,
     app.act.scheme.transformDeps
   ])(complete, cancel, scheme);
+};
+
+
+/**
+ * @param {} complete
+ * @param {} cancel
+ * @param {!Array.<!Object>} modules
+ */
+app.act.modules.filterEnabled = function(complete, cancel, modules) {
+  var result = [];
+
+  var i = 0,
+      l = modules.length;
+
+  while (i < l) {
+    if (!modules[i].disabled) {
+      result.push(modules[i]);
+    }
+
+    i += 1;
+  }
+
+  complete(result);
 };
 
 
@@ -943,6 +973,7 @@ cmd.make = function(complete, cancel) {
     app.act.gcc.readTemplate,
 
     app.act.scheme.get('modules'),
+    app.act.modules.filterEnabled,
 
     fm.each(fm.script([
       fm.assign('module'),
