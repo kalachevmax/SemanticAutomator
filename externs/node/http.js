@@ -30,7 +30,7 @@ END_NODE_INCLUDE
 var http = {};
 
 /**
- * @typedef {function(http.IncomingMessage, http.ServerResponse)}
+ * @typedef {function(!http.IncomingMessage, !http.ServerResponse)}
  */
 http.requestListener;
 
@@ -65,12 +65,12 @@ http.Server.prototype.close = function() {};
 http.IncomingMessage = function() {};
 
 /**
- * @type {?string}
+ * @type {string}
  * */
 http.IncomingMessage.prototype.method;
 
 /**
- * @type {?string}
+ * @type {string}
  */
 http.IncomingMessage.prototype.url;
 
