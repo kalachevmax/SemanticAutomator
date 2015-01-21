@@ -23,6 +23,11 @@
  */
 
 /**
+ * @typedef {string|!Buffer}
+ */
+stream.Chunk;
+
+/**
  BEGIN_NODE_INCLUDE
  var stream = require('stream');
  END_NODE_INCLUDE
@@ -135,7 +140,7 @@ stream.Readable.prototype.setEncoding = function(enc) {};
 
 /**
  * @param {number=} n
- * @return {!Buffer|string|null}
+ * @return {stream.Chunk|null}
  */
 stream.Readable.prototype.read = function(n) {};
 

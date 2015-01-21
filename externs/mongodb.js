@@ -47,6 +47,22 @@ mongodb.Collection.prototype.insert = function(doc, options, callback) {};
 
 
 /**
+ * @param {!Object} filter
+ * @param {!Object} doc
+ * @param {!Object|!Function} options
+ * @param {!Function=} callback
+ */
+mongodb.Collection.prototype.update = function(filter, doc, options, callback) {};
+
+
+/**
+ * @param {!Object} doc
+ * @param {!Function=} callback
+ */
+mongodb.Collection.prototype.remove = function(doc, callback) {};
+
+
+/**
  * @param {!Object} doc
  * @return {!mongodb.Cursor}
  */
