@@ -64,9 +64,10 @@ mongodb.Collection.prototype.remove = function(doc, callback) {};
 
 /**
  * @param {!Object} doc
+ * @param {!Object=} opt_options
  * @return {!mongodb.Cursor}
  */
-mongodb.Collection.prototype.find = function(doc) {};
+mongodb.Collection.prototype.find = function(doc, opt_options) {};
 
 
 /**

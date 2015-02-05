@@ -100,7 +100,7 @@ var global = {};
 
 /**
  * @constructor
- * @param {number|string} size
+ * @param {number|string|!Array} size
  * @param {string=} opt_encoding
  */
 var Buffer = function(size, opt_encoding) {};
