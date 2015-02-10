@@ -36,6 +36,12 @@ var fs = {};
 fs.FileContent;
 
 /**
+ * @typedef {*}
+ */
+fs.FileDescriptor;
+
+
+/**
  * @param {string} oldPath
  * @param {string} newPath
  * @param {function(...)=} callback
