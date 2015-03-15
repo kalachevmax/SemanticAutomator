@@ -167,3 +167,10 @@ process.uptime = function() {};
  * @nosideeffects
  */
 process.hrtime = function() {};
+
+
+/**
+ * @param {string} signalType
+ * @param {!Function} handler
+ */
+process.on = function(signalType, handler) {};
