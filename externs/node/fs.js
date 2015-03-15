@@ -367,13 +367,12 @@ fs.fsyncSync = function(fd) {};
 
 /**
  * @param {*} fd
- * @param {*} buffer
- * @param {number} offset
- * @param {number} length
- * @param {number} position
+ * @param {*} data
+ * @param {number|!Function} opt_position
+ * @param {(string|!Function)=} opt_encoding
  * @param {function(string, number, *)=} callback
  */
-fs.write = function(fd, buffer, offset, length, position, callback) {};
+fs.write = function(fd, data, opt_position, opt_encoding, callback) {};
 
 /**
  * @param {*} fd
