@@ -783,6 +783,7 @@ app.act.gcc.set = function(key) {
 
       generateSrcArgs,
       generateExternsArgs(fm.get('externs.node.dir')),
+      generateExternsArgs(fm.get('scheme', 'externs')),
       generateOptionsArgs,
       addOutput
     ])(function(args) {
